@@ -10,3 +10,4 @@ __pycache__/
 .pytest_cache/
 *.pyc
 lesson-docs/*_files/
+eval/results.json

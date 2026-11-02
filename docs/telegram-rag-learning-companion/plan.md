@@ -51,6 +51,7 @@ All paths are new (empty repo).
 **Evaluation (`eval/`)**
 - `eval/questions.jsonl`: ≥ 30 in-scope (from lesson-docs) + ≥ 10 out-of-scope labelled questions, Indonesian + some English
 - `eval/run_eval.py`: drives the pipeline against configured live endpoints (**run by the owner**, never from this session); scores latency p90, length, language, source citation, in/out-of-scope rates, persona
+- `eval/scoring.py` (pure scorer), `eval/pyproject.toml` (uv, no deps) *(amended, step 16)*
 - `eval/tests/test_scoring.py`: scorer tested on recorded fixtures
 
 **Docs**

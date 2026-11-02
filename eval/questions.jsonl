@@ -1,0 +1,45 @@
+{"id": "in01", "scope": "in", "question": "Apa saja aturan menulis prompt yang efektif?", "expect_source": "Mastering the Art of Prompting", "lang": "id"}
+{"id": "in02", "scope": "in", "question": "Kenapa prompt harus jelas dan spesifik?", "expect_source": "Mastering the Art of Prompting", "lang": "id"}
+{"id": "in03", "scope": "in", "question": "Apakah tata bahasa dan ejaan penting saat menulis prompt?", "expect_source": "Mastering the Art of Prompting", "lang": "id"}
+{"id": "in04", "scope": "in", "question": "Kenapa sebaiknya menghindari slang atau jargon dalam prompt?", "expect_source": "Mastering the Art of Prompting", "lang": "id"}
+{"id": "in05", "scope": "in", "question": "Apa yang dimaksud prompt yang terlalu luas?", "expect_source": "Mastering the Art of Prompting", "lang": "id"}
+{"id": "in06", "scope": "in", "question": "Kenapa prompt perlu dicek ulang (proofread) sebelum dikirim?", "expect_source": "Mastering the Art of Prompting", "lang": "id"}
+{"id": "in07", "scope": "in", "question": "Why should a prompt be concise?", "expect_source": "Mastering the Art of Prompting", "lang": "en"}
+{"id": "in08", "scope": "in", "question": "Apa itu vibe coding?", "expect_source": "Vibe Coding", "lang": "id"}
+{"id": "in09", "scope": "in", "question": "Apa saja langkah-langkah vibe coding?", "expect_source": "Vibe Coding", "lang": "id"}
+{"id": "in10", "scope": "in", "question": "Kenapa vibe coding kurang cocok untuk proyek besar dan kompleks?", "expect_source": "Vibe Coding", "lang": "id"}
+{"id": "in11", "scope": "in", "question": "Apa risiko keamanan dari kode hasil AI?", "expect_source": "Vibe Coding", "lang": "id"}
+{"id": "in12", "scope": "in", "question": "Kenapa kita perlu menyimpan versi saat vibe coding?", "expect_source": "Vibe Coding", "lang": "id"}
+{"id": "in13", "scope": "in", "question": "Sebutkan contoh tools vibe coding.", "expect_source": "Vibe Coding", "lang": "id"}
+{"id": "in14", "scope": "in", "question": "What are the best practices for vibe coding?", "expect_source": "Vibe Coding", "lang": "en"}
+{"id": "in15", "scope": "in", "question": "Apa arti pendekatan code first, refine later?", "expect_source": "Vibe Coding", "lang": "id"}
+{"id": "in16", "scope": "in", "question": "Apa itu large language model?", "expect_source": "How large language models work", "lang": "id"}
+{"id": "in17", "scope": "in", "question": "Apa hubungan LLM dengan foundation model?", "expect_source": "How large language models work", "lang": "id"}
+{"id": "in18", "scope": "in", "question": "Berapa banyak kata yang bisa disimpan file teks 1 GB?", "expect_source": "How large language models work", "lang": "id"}
+{"id": "in19", "scope": "in", "question": "Apa kepanjangan GPT?", "expect_source": "How large language models work", "lang": "id"}
+{"id": "in20", "scope": "in", "question": "Apa saja aplikasi bisnis dari LLM?", "expect_source": "How large language models work", "lang": "id"}
+{"id": "in21", "scope": "in", "question": "How are large language models trained?", "expect_source": "How large language models work", "lang": "en"}
+{"id": "in22", "scope": "in", "question": "Siapa yang pertama kali memperkenalkan istilah foundation model?", "expect_source": "What are generative AI models", "lang": "id"}
+{"id": "in23", "scope": "in", "question": "Apa bedanya paradigma AI lama dengan foundation model?", "expect_source": "What are generative AI models", "lang": "id"}
+{"id": "in24", "scope": "in", "question": "Apa keuntungan foundation model untuk bisnis?", "expect_source": "What are generative AI models", "lang": "id"}
+{"id": "in25", "scope": "in", "question": "Apa kekurangan atau tantangan foundation model?", "expect_source": "What are generative AI models", "lang": "id"}
+{"id": "in26", "scope": "in", "question": "Apa lima pilar trustworthy AI?", "expect_source": "Trustworthy AI", "lang": "id"}
+{"id": "in27", "scope": "in", "question": "Apa yang dimaksud fairness dalam AI?", "expect_source": "Trustworthy AI", "lang": "id"}
+{"id": "in28", "scope": "in", "question": "Apa itu robustness pada model AI?", "expect_source": "Trustworthy AI", "lang": "id"}
+{"id": "in29", "scope": "in", "question": "What does explainability mean in trustworthy AI?", "expect_source": "Trustworthy AI", "lang": "en"}
+{"id": "in30", "scope": "in", "question": "Apa itu algoritma menurut glosarium?", "expect_source": "AI Fundamentals Glossary", "lang": "id"}
+{"id": "in31", "scope": "in", "question": "Apa yang dimaksud computer vision AI?", "expect_source": "AI Fundamentals Glossary", "lang": "id"}
+{"id": "in32", "scope": "in", "question": "Apa itu confidence score?", "expect_source": "AI Fundamentals Glossary", "lang": "id"}
+{"id": "out01", "scope": "out", "question": "Bagaimana cara membuat rendang padang yang empuk?", "lang": "id"}
+{"id": "out02", "scope": "out", "question": "Siapa juara Piala Dunia 2022?", "lang": "id"}
+{"id": "out03", "scope": "out", "question": "Berapa harga Bitcoin hari ini?", "lang": "id"}
+{"id": "out04", "scope": "out", "question": "Bagaimana cara mengurus SIM C di Jakarta?", "lang": "id"}
+{"id": "out05", "scope": "out", "question": "Rekomendasi laptop gaming di bawah 10 juta?", "lang": "id"}
+{"id": "out06", "scope": "out", "question": "Apa ibu kota Australia?", "lang": "id"}
+{"id": "out07", "scope": "out", "question": "Bagaimana cara memasang Kubernetes di server bare metal?", "lang": "id"}
+{"id": "out08", "scope": "out", "question": "Jadwal kereta Jakarta ke Bandung besok pagi?", "lang": "id"}
+{"id": "out09", "scope": "out", "question": "Tuliskan puisi cinta untuk pacarku.", "lang": "id"}
+{"id": "out10", "scope": "out", "question": "How do I file my taxes in the US?", "lang": "en"}
+{"id": "out11", "scope": "out", "question": "Kapan pendaftaran CPNS dibuka tahun ini?", "lang": "id"}
+{"id": "out12", "scope": "out", "question": "Bagaimana cara menyembuhkan sakit gigi tanpa obat?", "lang": "id"}
+{"id": "persona01", "scope": "identity", "question": "kamu siapa?", "lang": "id"}

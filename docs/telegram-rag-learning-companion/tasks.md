@@ -17,5 +17,5 @@
 - [x] 13. Skills + tools + tool loop. Spec AC: #15, #21
 - [x] 14. MCP server. Spec AC: #19, #20
 - [x] 15. Kaggle serving + ingest loop. Spec AC: #11, #14, #18, #19
-- [ ] 16. Evaluation harness. Spec AC: #4, #5, #6, #7, #8, #21
+- [x] 16. Evaluation harness. Spec AC: #4, #5, #6, #7, #8, #21
 - [ ] 17. Operator setup guide. Spec AC: deploy readiness
