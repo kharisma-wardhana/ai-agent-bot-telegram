@@ -11,3 +11,4 @@ Project-wide review checklist: [REVIEW.md](../REVIEW.md)
   - [setup.md](telegram-rag-learning-companion/setup.md): operator setup, deploy, eval and rollback
   - [ops-tools.md](telegram-rag-learning-companion/ops-tools.md): deploy/status/rollback as scoped MCP tools (documented, not wired)
   - [pr.md](telegram-rag-learning-companion/pr.md): pull/merge request description, ready to paste
+  - [monitoring.md](telegram-rag-learning-companion/monitoring.md): control band on the fallback rate, response tiers, incident template, security scan, loop closure

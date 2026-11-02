@@ -21,6 +21,8 @@ packages = ["src/skilly_kaggle"]
 
 [tool.uv]
 exclude-newer = "2026-10-19T00:00:00Z"
+# Security exception (2026-11-02, Phase 6): pypdf <6.21.4 has 10 DoS advisories; allow the fixed release past the cutoff.
+exclude-newer-package = { pypdf = "2026-11-02T00:00:00Z" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
