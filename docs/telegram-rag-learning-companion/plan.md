@@ -123,7 +123,8 @@ Each is shown as its own diff and needs its own `approve write` before it is wri
 3. **Subagent `answer-quality-reviewer`** (read-only: Read, Grep, Glob): reviews prompt/persona/length-policy changes and eval output against AC 5, 6, 7, 21. A recurring task, since every prompt tweak needs it.
 4. **Hook `guard-tests` (recipe 3)**: Phase 4, only if fix tasks arise.
 5. **Hook `deploy-gate` (recipe 4) + credential deny-list**: Phase 5, extended with `wrangler deploy|wrangler secret|supabase db push|kaggle kernels push|cloudflared tunnel`.
-6. **CI agent-config eval job**: **deferred**, no CI platform (Phase 0 answer: "no CI").
+6. **CI agent-config eval job**: **deferred**, no CI platform (Phase 0 answer: "no CI"). CI judgement jobs (triage, changelog) from Phase 5 are deferred for the same reason.
+7. **Credential read deny-list + `ask` rules** in `.claude/settings.json` (Phase 5).
 
 Parallel sessions: steps 5 (Python ingest) and 15 (Kaggle) share no files with the Worker steps 6–14. A worktree for the Python track is possible if you want two sessions. It won't be created unless you ask.
 
