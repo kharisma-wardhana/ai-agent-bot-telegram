@@ -4,7 +4,7 @@
 
 - [x] 1. Scaffold. Spec AC: foundation for all
 - [x] 2. Schema. Spec AC: #14, #17, #22
-- [ ] 3. Repository layer + fakes. Spec AC: #14, #17
+- [x] 3. Repository layer + fakes. Spec AC: #14, #17
 - [ ] 4. LLM router + embeddings. Spec AC: #18
 - [ ] 5. Python ingestion + seed CLI. Spec AC: #14, #22
 - [ ] 6. Retrieval, grounding, length policy, persona prompt. Spec AC: #5, #6, #7, #8, #21

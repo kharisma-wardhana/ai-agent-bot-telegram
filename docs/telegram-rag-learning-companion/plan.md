@@ -14,6 +14,7 @@ All paths are new (empty repo).
 **Database**
 - `db/migrations/0001_init.sql`: extensions (`vector`), all tables from [spec › Data](spec.md#data)
 - `db/migrations/0002_functions.sql`: `match_chunks`, `delete_learner_data`, `expire_sessions`, `claim_ingest_job`, view `answer_source_ratio`
+- `db/migrations/0003_repository_rpc.sql`: every remaining data operation as a SQL function, so PostgREST (prod) and PGlite (tests) run identical SQL *(amended during build, step 3)*
 
 **Cloudflare Worker (`worker/`)**
 - `worker/package.json`, `worker/tsconfig.json`, `worker/wrangler.toml` (DO, AI, R2 bindings; cron), `worker/vitest.config.ts` (workers-pool project + node project for DB tests), `worker/.dev.vars.example` (names only, no values)
@@ -59,7 +60,7 @@ All paths are new (empty repo).
 **Slice 1: Foundations**
 1. **Scaffold**: `.gitignore`, root `package.json`/`pnpm-workspace.yaml`/`pnpm-lock.yaml`, `worker/package.json`, `tsconfig.json`, `wrangler.toml`, `vitest.config.ts`, `.dev.vars.example`, `worker/src/config.ts`, `worker/src/index.ts` (health-route stub only, needed as the test runner's entry; step 8 fills it), `ingest/pyproject.toml`. Supports all ACs. *(Amended during build: index.ts stub moved forward from step 8.)*
 2. **Schema**: `db/migrations/0001_init.sql`, `0002_functions.sql`. Advances AC 14, 17, 22.
-3. **Repository layer + fakes**: `worker/src/db/repository.ts`, `worker/test/fakes/*`. Advances AC 14, 17.
+3. **Repository layer + fakes**: `db/migrations/0003_repository_rpc.sql`, `worker/src/db/repository.ts`, `worker/test/db/pglite-rpc.ts`, `worker/test/fakes/fake-repository.ts`. Advances AC 14, 17.
 4. **LLM router + embeddings**: `worker/src/llm/*`. Advances AC 18.
 5. **Python ingestion + seed CLI**: `ingest/src/ingest/*`, `ingest/tests/*`, `worker/src/rag/chunker.ts`. Advances AC 14, 22.
 
