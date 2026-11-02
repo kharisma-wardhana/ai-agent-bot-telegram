@@ -1,3 +1,4 @@
+import { PRIVACY_NOTICE } from "../../src/answer/persona";
 import type { TgMessage, TgUpdate } from "../../src/telegram/types";
 
 export interface SentCall { method: string; params: Record<string, unknown> }
@@ -45,6 +46,11 @@ export class FakeTelegram {
     return this.calls
       .filter((c) => (c.method === "sendMessage" || c.method === "editMessageText") && Number(c.params.chat_id) === chatId)
       .map((c) => String(c.params.text));
+  }
+
+  /** Last text the chat saw, ignoring the one-time privacy notice. */
+  lastAnswer(chatId: number): string | undefined {
+    return this.textsIn(chatId).filter((t) => t !== PRIVACY_NOTICE).at(-1);
   }
 
   /** Final visible text of each message in a chat (last edit wins). */

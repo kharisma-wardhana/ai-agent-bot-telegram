@@ -37,7 +37,7 @@ describe("session memory (AC 15)", () => {
     expect(history.join(" ")).toContain("prompt yang baik");
     expect(h.repo.sessions.filter((x) => x.learnerId === ani.id)).toHaveLength(1);
     expect(h.repo.turns.filter((t) => t.sessionId === s.id)).toHaveLength(4);
-    expect(h.tg.textsIn(ani.id).at(-1)).toContain("Versi sederhana");
+    expect(h.tg.lastAnswer(ani.id)).toContain("Versi sederhana");
   });
 });
 
@@ -49,7 +49,7 @@ describe("feedback closes the session (AC 16)", () => {
     expect(s.status).toBe("closed_feedback");
     expect(h.repo.feedback.at(-1)).toMatchObject({ sessionId: s.id, kind: "button", value: "up" });
     expect(h.tg.sent("answerCallbackQuery")).toHaveLength(1);
-    expect(h.tg.textsIn(ani.id).at(-1)).toBe(FEEDBACK_THANKS);
+    expect(h.tg.lastAnswer(ani.id)).toBe(FEEDBACK_THANKS);
   });
 
   it("via a ✅ reaction", async () => {

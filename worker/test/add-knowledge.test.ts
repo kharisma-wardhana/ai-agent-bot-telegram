@@ -40,7 +40,7 @@ describe("/add_knowledge text (AC 13)", () => {
     const ani = learner(501, "Ani");
     await h.send(groupAsk("#askAI vektor database menyimpan apa untuk pencarian semantik?", { from: ani }));
     await h.drain(ani.id);
-    expect(h.tg.textsIn(ani.id).at(-1)).toContain("📚 Sumber: Vektor database menyimpan embedding");
+    expect(h.tg.lastAnswer(ani.id)).toContain("📚 Sumber: Vektor database menyimpan embedding");
   });
 
   it("reports a duplicate instead of adding it twice", async () => {

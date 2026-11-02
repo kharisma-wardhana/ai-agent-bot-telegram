@@ -1,8 +1,9 @@
 import { composeFinal } from "../answer/length-policy";
-import { isIdentityQuestion, PERSONA_INTRO } from "../answer/persona";
+import { isIdentityQuestion, PERSONA_INTRO, PRIVACY_NOTICE } from "../answer/persona";
 import { buildMessages, compressionMessages } from "../answer/prompts";
 import type { Backend, QuestionKind } from "../db/repository";
 import type { Deps } from "../deps";
+import { recallMemory } from "../memory/graph-store";
 import { decide, sourceLine } from "../rag/grounding";
 import { retrieve } from "../rag/retrieve";
 import { TelegramError } from "../telegram/client";
@@ -24,7 +25,7 @@ const NOT_FOUND_GUARD = 12; // buffer this many chars before streaming, so a NOT
 /** Retrieval → generation → grounding → length policy. Streams into `progress` when given. */
 export async function answerQuestion(
   d: Deps,
-  a: { sessionId: string; question: string; imageDataUrl?: string; progress: ProgressMessage | null },
+  a: { learnerId: number; sessionId: string; question: string; imageDataUrl?: string; progress: ProgressMessage | null },
 ): Promise<AnswerOutcome> {
   if (!a.imageDataUrl && isIdentityQuestion(a.question)) return { kind: "answer", text: PERSONA_INTRO, sources: [], backend: null };
 
@@ -39,7 +40,8 @@ export async function answerQuestion(
   if (!r.found && !a.imageDataUrl) return { kind: "fallback", reason: "low_similarity" };
 
   await a.progress?.stage("composing");
-  const messages = buildMessages({ question: a.question, chunks: r.chunks, history, imageDataUrl: a.imageDataUrl, maxChars: d.cfg.maxAnswerChars });
+  const memoryNotes = await recallMemory(d, a.learnerId, r.embedding);
+  const messages = buildMessages({ question: a.question, chunks: r.chunks, history, memoryNotes, imageDataUrl: a.imageDataUrl, maxChars: d.cfg.maxAnswerChars });
 
   let buf = "";
   let streaming = false;
@@ -83,7 +85,7 @@ export async function handleQuestion(d: Deps, from: TgUser, origin: Origin | nul
 
   let outcome: AnswerOutcome;
   try {
-    outcome = await answerQuestion(d, { sessionId, question: resolved.question, imageDataUrl: resolved.imageDataUrl, progress });
+    outcome = await answerQuestion(d, { learnerId: learner.telegramId, sessionId, question: resolved.question, imageDataUrl: resolved.imageDataUrl, progress });
   } catch (err) {
     console.error("answer failed", (err as Error).message);
     outcome = { kind: "fallback", reason: "error" };
@@ -94,7 +96,10 @@ export async function handleQuestion(d: Deps, from: TgUser, origin: Origin | nul
   if (outcome.kind === "fallback") {
     await runFallback(d, { chatId: e.chatId, threadId: e.threadId, messageId: e.messageId, from: e.from, question: resolved.question, sessionId, photoFileId: resolved.photoFileId });
     await d.repo.addTurn({ sessionId, role: "assistant", content: LEARNER_FALLBACK_DM, answerSource: "fallback", stageTimings: progress?.timings });
-    if (progress) await progress.finish(LEARNER_FALLBACK_DM).catch(() => undefined);
+    if (progress) {
+      await progress.finish(LEARNER_FALLBACK_DM).catch(() => undefined);
+      await sendPrivacyNoticeOnce(d, learner.telegramId, learner.privacyNoticeShown);
+    }
     return;
   }
 
@@ -102,6 +107,7 @@ export async function handleQuestion(d: Deps, from: TgUser, origin: Origin | nul
 
   if (progress) {
     await progress.finish(outcome.text, FEEDBACK_KEYBOARD);
+    await sendPrivacyNoticeOnce(d, learner.telegramId, learner.privacyNoticeShown);
     return;
   }
   // Learner can't be DMed yet: hold the answer and post a deep link in the topic (AC 12).
@@ -129,11 +135,28 @@ export async function tryStartProgress(d: Deps, learnerId: number): Promise<Prog
 
 /** /start [q_<id>]: marks the learner started and delivers any held answers (AC 12). */
 export async function handleStart(d: Deps, e: Extract<BotEvent, { kind: "start" }>): Promise<void> {
-  await d.repo.upsertLearner({ telegramId: e.from.id, displayName: e.from.first_name, username: e.from.username ?? null, started: true });
+  const learner = await d.repo.upsertLearner({ telegramId: e.from.id, displayName: e.from.first_name, username: e.from.username ?? null, started: true });
   const held = await d.repo.takePendingAnswers(e.from.id, "not_started", 5);
-  if (held.length === 0) {
-    await d.tg.sendMessage(e.from.id, PERSONA_INTRO);
-    return;
-  }
+  if (held.length === 0) await d.tg.sendMessage(e.from.id, PERSONA_INTRO);
   for (const h of held) await d.tg.sendMessage(e.from.id, String(h.payload.text ?? ""), { replyMarkup: FEEDBACK_KEYBOARD });
+  await sendPrivacyNoticeOnce(d, learner.telegramId, learner.privacyNoticeShown);
+}
+
+/** The first DM a learner ever gets is followed by the one-time privacy notice (spec › Behaviour 12). */
+export async function sendPrivacyNoticeOnce(d: Deps, learnerId: number, alreadyShown: boolean): Promise<void> {
+  if (alreadyShown) return;
+  try {
+    await d.tg.sendMessage(learnerId, PRIVACY_NOTICE);
+    await d.repo.markPrivacyNoticeShown(learnerId);
+  } catch (e) {
+    console.error("privacy notice failed", (e as Error).message);
+  }
+}
+
+export const HAPUSDATA_DONE = "🗑️ Semua datamu (sesi, riwayat percakapan, feedback, dan memori jangka panjang) sudah dihapus.";
+
+/** /hapusdata: deletes everything stored about the caller, and only the caller (AC 17). */
+export async function handleHapusData(d: Deps, e: Extract<BotEvent, { kind: "hapusdata" }>): Promise<void> {
+  await d.repo.deleteLearnerData(e.from.id);
+  await d.tg.sendMessage(e.from.id, HAPUSDATA_DONE);
 }

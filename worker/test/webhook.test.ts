@@ -42,7 +42,7 @@ describe("#askAI → DM answer (AC 1, 2, 3)", () => {
     const joined = dmTexts.join("\n---\n");
     expect(joined.indexOf(STAGES.searching)).toBeGreaterThan(-1);
     expect(joined.indexOf(STAGES.composing)).toBeGreaterThan(joined.indexOf(STAGES.searching));
-    const final = dmTexts.at(-1)!;
+    const final = h.tg.lastAnswer(ani.id)!;
     expect(final).toContain("prompt yang baik");
     expect(final).toContain("📚 Sumber: Mastering the Art of Prompting");
     expect(final.length).toBeLessThanOrEqual(1000);
@@ -80,7 +80,7 @@ describe("mentor fallback (AC 9)", () => {
     }
     expect(h.repo.followups).toHaveLength(1);
     expect(h.repo.followups[0]!.mentorIds).toEqual(MENTORS);
-    expect(h.tg.textsIn(ani.id).at(-1)).toBe(LEARNER_FALLBACK_DM);
+    expect(h.tg.lastAnswer(ani.id)).toBe(LEARNER_FALLBACK_DM);
     expect(h.repo.turns.find((t) => t.role === "assistant")!.answerSource).toBe("fallback");
   });
 
@@ -109,7 +109,7 @@ describe("learner who never started the bot (AC 12)", () => {
     await h.send(dm(`/start ${link![1]}`, { from: ani }));
     await h.drain(ani.id);
     expect(Date.now() - t0).toBeLessThan(10_000);
-    const delivered = h.tg.textsIn(ani.id).at(-1)!;
+    const delivered = h.tg.lastAnswer(ani.id)!;
     expect(delivered).toContain("📚 Sumber: Mastering the Art of Prompting");
     expect(h.repo.learners.get(ani.id)!.hasStarted).toBe(true);
   });
@@ -119,7 +119,7 @@ describe("persona identity (AC 21)", () => {
   it("answers 'kamu siapa?' as Kak Skilly without a mentor fallback", async () => {
     await h.send(groupAsk("#askAI kamu siapa?", { from: ani }));
     await h.drain(ani.id);
-    expect(h.tg.textsIn(ani.id).at(-1)).toContain("Kak Skilly");
+    expect(h.tg.lastAnswer(ani.id)).toContain("Kak Skilly");
     expect(h.tg.textsIn(GROUP_ID)).toEqual([]);
     expect(h.repo.followups).toHaveLength(0);
   });

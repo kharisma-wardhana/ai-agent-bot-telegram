@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "./config";
 import { getDeps, type Deps } from "./deps";
 import type { DeferredImage } from "./media/image";
+import { runMemoryJob } from "./memory/graph-extractor";
 import type { DeferredImageEvent, LearnerSession } from "./pipeline/learner-session";
 import { classify } from "./telegram/parse-update";
 import type { TgUpdate } from "./telegram/types";
@@ -56,13 +57,20 @@ export async function deliverDeferredImages(d: Deps, env: Env): Promise<number> 
   return items.length;
 }
 
-/** Cron (every 5 min): deferred images. Later steps add expiry and the long-term-memory job. */
+/** Cron (every 5 min): expire idle sessions, distil ended ones into memory, deliver deferred images. Each job isolated. */
 export async function runScheduled(env: Env): Promise<void> {
   const d = getDeps(env);
-  try {
-    await deliverDeferredImages(d, env);
-  } catch (e) {
-    console.error("deferred image delivery failed", (e as Error).message);
+  const jobs: [string, () => Promise<unknown>][] = [
+    ["expire sessions", () => d.repo.expireSessions(d.cfg.sessionTtlHours)],
+    ["memory job", () => runMemoryJob(d)],
+    ["deferred images", () => deliverDeferredImages(d, env)],
+  ];
+  for (const [name, job] of jobs) {
+    try {
+      await job();
+    } catch (e) {
+      console.error(`${name} failed`, (e as Error).message);
+    }
   }
 }
 

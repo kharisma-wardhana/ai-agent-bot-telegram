@@ -7,7 +7,7 @@ import { IMAGE_DEFERRED_MSG, resolveMedia, type DeferredImage } from "../media/i
 import type { BotEvent, Media } from "../telegram/parse-update";
 import type { ProgressMessage } from "../telegram/progress";
 import type { TgUser } from "../telegram/types";
-import { handleQuestion, handleStart, tryStartProgress, type Origin } from "./ask-pipeline";
+import { handleHapusData, handleQuestion, handleStart, tryStartProgress, type Origin } from "./ask-pipeline";
 
 /** Internal event: an image question deferred while Kaggle was offline, re-queued by the cron. */
 export interface DeferredImageEvent { kind: "deferred_image"; from: TgUser; payload: DeferredImage }
@@ -104,8 +104,10 @@ export class LearnerSession extends DurableObject<Env> {
         return handleStart(d, e);
       case "add_knowledge":
         return handleAddKnowledge(d, e);
-      default:
-        return; // later slices: hapusdata
+      case "hapusdata":
+        await handleHapusData(d, e);
+        await this.ctx.storage.deleteAlarm();
+        return;
     }
   }
 }

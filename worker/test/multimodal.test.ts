@@ -31,7 +31,7 @@ describe("voice questions (AC 10)", () => {
     expect(h.transcriber.calls).toBe(1);
     const dmTexts = h.tg.textsIn(ani.id);
     expect(dmTexts.some((t) => t.includes(STAGES.transcribing))).toBe(true);
-    expect(dmTexts.at(-1)).toContain("📚 Sumber: Mastering the Art of Prompting");
+    expect(h.tg.lastAnswer(ani.id)).toContain("📚 Sumber: Mastering the Art of Prompting");
     const userTurn = h.repo.turns.find((t) => t.role === "user")!;
     expect(userTurn).toMatchObject({ questionKind: "voice", content: "apa itu few-shot prompting" });
     expect(await bucketKeys()).toEqual(r2Before);
@@ -42,7 +42,7 @@ describe("voice questions (AC 10)", () => {
     h.transcriber.text = "";
     await h.send(groupAsk("#askAI", { from: ani, voice: true }));
     await h.drain(ani.id);
-    expect(h.tg.textsIn(ani.id).at(-1)).toBe(AUDIO_FAILED_MSG);
+    expect(h.tg.lastAnswer(ani.id)).toBe(AUDIO_FAILED_MSG);
     expect(h.repo.followups).toHaveLength(0);
   });
 });
@@ -58,7 +58,7 @@ describe("photo questions (AC 11)", () => {
     const img = (user.content as { type: string; image_url?: { url: string } }[]).find((p) => p.type === "image_url")!;
     expect(img.image_url!.url).toMatch(/^data:image\/jpeg;base64,/);
     expect(h.tg.textsIn(ani.id).some((t) => t.includes(STAGES.reading_image))).toBe(true);
-    expect(h.tg.textsIn(ani.id).at(-1)).toContain("prompt yang baik");
+    expect(h.tg.lastAnswer(ani.id)).toContain("prompt yang baik");
     expect(h.repo.turns.find((t) => t.role === "user")!.questionKind).toBe("photo");
     expect(JSON.stringify(h.repo.turns)).not.toContain("base64");
   });
@@ -67,7 +67,7 @@ describe("photo questions (AC 11)", () => {
     h.repo.heartbeatAge = null;
     await h.send(groupAsk("#askAI ini contoh few-shot prompting bukan?", { from: ani, photo: true }));
     await h.drain(ani.id);
-    expect(h.tg.textsIn(ani.id).at(-1)).toBe(IMAGE_DEFERRED_MSG);
+    expect(h.tg.lastAnswer(ani.id)).toBe(IMAGE_DEFERRED_MSG);
     expect(h.kaggle.requests).toHaveLength(0);
     expect(h.workersAi.requests).toHaveLength(0); // images are never downgraded to the text model
     expect(h.repo.pending.filter((p) => p.reason === "image_deferred" && !p.delivered)).toHaveLength(1);
@@ -81,7 +81,7 @@ describe("photo questions (AC 11)", () => {
     await runScheduled(h.deps.env);
     await h.drain(ani.id);
     expect(h.kaggle.requests).toHaveLength(1);
-    expect(h.tg.textsIn(ani.id).at(-1)).toContain("prompt yang baik");
+    expect(h.tg.lastAnswer(ani.id)).toContain("prompt yang baik");
     expect(h.tg.textsIn(GROUP_ID)).toEqual([]);
   });
 });
