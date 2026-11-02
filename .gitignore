@@ -10,4 +10,5 @@ __pycache__/
 .pytest_cache/
 *.pyc
 lesson-docs/*_files/
+# local output of eval/run_eval.py (contains bot answers)
 eval/results.json
