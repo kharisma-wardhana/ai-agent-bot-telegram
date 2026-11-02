@@ -4,6 +4,7 @@ import { KaggleBackend } from "./llm/kaggle";
 import { LlmRouter } from "./llm/router";
 import type { Embedder } from "./llm/types";
 import { WorkersAiBackend, WorkersAiEmbedder } from "./llm/workers-ai";
+import { WorkersAiTranscriber, type Transcriber } from "./media/transcribe";
 import { TelegramClient } from "./telegram/client";
 
 /** Everything the pipeline needs, built once per request/alarm from env. */
@@ -13,6 +14,7 @@ export interface Deps {
   tg: TelegramClient;
   router: LlmRouter;
   embedder: Embedder;
+  transcriber: Transcriber;
   env: Env;
   fetchFn: typeof fetch;
   now: () => number;
@@ -27,7 +29,7 @@ export function buildDeps(env: Env): Deps {
     () => repo.heartbeatAgeSeconds("kaggle"),
     cfg.heartbeatMaxAgeS,
   );
-  return { cfg, repo, tg: new TelegramClient(cfg.telegramBotToken), router, embedder: new WorkersAiEmbedder(env.AI), env, fetchFn: fetch, now: Date.now };
+  return { cfg, repo, tg: new TelegramClient(cfg.telegramBotToken), router, embedder: new WorkersAiEmbedder(env.AI), transcriber: new WorkersAiTranscriber(env.AI), env, fetchFn: fetch, now: Date.now };
 }
 
 let override: ((env: Env) => Deps) | null = null;

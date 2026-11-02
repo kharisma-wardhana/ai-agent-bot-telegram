@@ -3,10 +3,15 @@ import type { Env } from "../config";
 import { getDeps, type Deps } from "../deps";
 import { handleAddKnowledge } from "../knowledge/add-knowledge";
 import { feedbackFromEvent, handleFeedback, isTextFeedback, sessionDeadline } from "../memory/session";
-import type { BotEvent } from "../telegram/parse-update";
-import { handleAsk, handleQuestion, handleStart, tryStartProgress } from "./ask-pipeline";
+import { IMAGE_DEFERRED_MSG, resolveMedia, type DeferredImage } from "../media/image";
+import type { BotEvent, Media } from "../telegram/parse-update";
+import type { ProgressMessage } from "../telegram/progress";
+import type { TgUser } from "../telegram/types";
+import { handleQuestion, handleStart, tryStartProgress, type Origin } from "./ask-pipeline";
 
-type QueuedEvent = Exclude<BotEvent, { kind: "ignore" }>;
+/** Internal event: an image question deferred while Kaggle was offline, re-queued by the cron. */
+export interface DeferredImageEvent { kind: "deferred_image"; from: TgUser; payload: DeferredImage }
+type QueuedEvent = Exclude<BotEvent, { kind: "ignore" }> | DeferredImageEvent;
 const BUSY_STALE_MS = 5 * 60_000;
 
 /**
@@ -66,22 +71,30 @@ export class LearnerSession extends DurableObject<Env> {
     return queue.length === 0 && !(await this.ctx.storage.get<number>("busy"));
   }
 
+  /** Text, voice or photo question from the group (origin) or DM (origin null). */
+  private async question(d: Deps, from: TgUser, origin: Origin | null, text: string, media: Media | null): Promise<void> {
+    const progress: ProgressMessage | null = await tryStartProgress(d, from.id);
+    if (!media) return handleQuestion(d, from, origin, { question: text, kind: "text" }, progress);
+    const res = await resolveMedia(d, media, text, { from, origin, progress });
+    if (res.kind === "ready") return handleQuestion(d, from, origin, res.resolved, progress);
+    const msg = res.kind === "deferred" ? IMAGE_DEFERRED_MSG : res.message;
+    if (progress) await progress.finish(msg);
+    else if (origin) await d.tg.sendMessage(origin.chatId, msg, { threadId: origin.threadId ?? undefined, replyTo: origin.messageId });
+  }
+
   protected async handle(d: Deps, e: QueuedEvent): Promise<void> {
     switch (e.kind) {
-      case "ask": {
-        const progress = await tryStartProgress(d, e.from.id);
-        await handleAsk(d, e, { question: e.question, kind: "text" }, progress);
-        return;
-      }
+      case "ask":
+        return this.question(d, e.from, { chatId: e.chatId, threadId: e.threadId, messageId: e.messageId }, e.question, e.media);
       case "dm_text": {
         if (await isTextFeedback(d, e)) {
           await handleFeedback(d, e.from.id, "text", e.text.slice(0, 500));
           return;
         }
-        const progress = await tryStartProgress(d, e.from.id);
-        await handleQuestion(d, e.from, null, { question: e.text, kind: "text" }, progress);
-        return;
+        return this.question(d, e.from, null, e.text, e.media);
       }
+      case "deferred_image":
+        return this.question(d, e.from, e.payload.origin, e.payload.question, { type: "photo", fileId: e.payload.fileId });
       case "feedback": {
         const f = feedbackFromEvent(e);
         await handleFeedback(d, e.from.id, f.kind, f.value, f.callbackId);

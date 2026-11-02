@@ -77,7 +77,7 @@ All paths are new (empty repo).
 10. **Sessions, feedback close, 24 h alarm**: `worker/src/memory/session.ts`, `learner-session.ts` alarm, feedback/reaction handling in `parse-update.ts`. Advances AC 15, 16.
 
 **Slice 5: Multimodal**
-11. **Voice + photo questions**: `worker/src/media/*`, image deferral in `ask-pipeline.ts`. Advances AC 10, 11.
+11. **Voice + photo questions**: `worker/src/media/*`, `worker/src/deps.ts` (transcriber), image handling in `learner-session.ts`, deferred-image delivery in `scheduled()` of `worker/src/index.ts` *(amended during build: cron entry moved forward from step 12)*. Advances AC 10, 11.
 
 **Slice 6: Long-term graph memory + data deletion**
 12. **Graph extraction cron, recall, `/hapusdata`, privacy notice**: `worker/src/memory/graph-*.ts`, `scheduled()` in `index.ts`. Advances AC 16, 17.

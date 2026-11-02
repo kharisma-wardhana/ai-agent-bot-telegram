@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import type { Env } from "./config";
-import { getDeps } from "./deps";
-import type { LearnerSession } from "./pipeline/learner-session";
+import { getDeps, type Deps } from "./deps";
+import type { DeferredImage } from "./media/image";
+import type { DeferredImageEvent, LearnerSession } from "./pipeline/learner-session";
 import { classify } from "./telegram/parse-update";
 import type { TgUpdate } from "./telegram/types";
 
@@ -20,6 +21,11 @@ export function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+function learnerStub(env: Env, userId: number) {
+  const ns = env.LEARNER_SESSION as DurableObjectNamespace<LearnerSession>;
+  return ns.get(ns.idFromName(String(userId)));
+}
+
 app.post("/telegram/webhook", async (c) => {
   const d = getDeps(c.env);
   const secret = c.req.header("X-Telegram-Bot-Api-Secret-Token") ?? "";
@@ -34,9 +40,35 @@ app.post("/telegram/webhook", async (c) => {
   const event = classify(update, d.cfg);
   if (event.kind === "ignore") return c.json({ ok: true });
 
-  const ns = c.env.LEARNER_SESSION as DurableObjectNamespace<LearnerSession>;
-  await ns.get(ns.idFromName(String(event.from.id))).enqueue(event);
+  await learnerStub(c.env, event.from.id).enqueue(event);
   return c.json({ ok: true });
 });
 
-export default app;
+/** Re-queues image questions deferred while Kaggle was offline, once it is back (AC 11). */
+export async function deliverDeferredImages(d: Deps, env: Env): Promise<number> {
+  if (!(await d.router.primaryOnline())) return 0;
+  const items = await d.repo.takePendingAnswers(null, "image_deferred", 20);
+  for (const item of items) {
+    const payload = item.payload as unknown as DeferredImage;
+    const event: DeferredImageEvent = { kind: "deferred_image", from: payload.from, payload };
+    await learnerStub(env, payload.from.id).enqueue(event);
+  }
+  return items.length;
+}
+
+/** Cron (every 5 min): deferred images. Later steps add expiry and the long-term-memory job. */
+export async function runScheduled(env: Env): Promise<void> {
+  const d = getDeps(env);
+  try {
+    await deliverDeferredImages(d, env);
+  } catch (e) {
+    console.error("deferred image delivery failed", (e as Error).message);
+  }
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runScheduled(env));
+  },
+} satisfies ExportedHandler<Env>;

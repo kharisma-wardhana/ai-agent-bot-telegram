@@ -26,6 +26,7 @@ export interface Harness {
   tg: FakeTelegram;
   repo: FakeRepository;
   embedder: FakeEmbedder;
+  transcriber: { text: string; calls: number };
   kaggle: FakeBackend;
   workersAi: FakeBackend;
   deps: Deps;
@@ -39,6 +40,7 @@ export function makeHarness(opts: { heartbeatAge?: number | null } = {}): Harnes
   const repo = new FakeRepository();
   repo.heartbeatAge = opts.heartbeatAge === undefined ? 5 : opts.heartbeatAge;
   const embedder = new FakeEmbedder();
+  const transcriber = { text: "apa itu few-shot prompting", calls: 0, async transcribe() { this.calls++; return this.text; } };
   const kaggle = new FakeBackend("kaggle", true, groundedScript);
   const workersAi = new FakeBackend("workers_ai", false, groundedScript);
   const testEnv = {
@@ -50,14 +52,14 @@ export function makeHarness(opts: { heartbeatAge?: number | null } = {}): Harnes
   } as Env;
   const cfg = parseConfig(testEnv);
   const deps: Deps = {
-    cfg, repo, embedder, env: testEnv, fetchFn: tg.fetch, now: Date.now,
+    cfg, repo, embedder, transcriber, env: testEnv, fetchFn: tg.fetch, now: Date.now,
     tg: new TelegramClient(cfg.telegramBotToken, tg.fetch),
     router: new LlmRouter(kaggle, workersAi, () => repo.heartbeatAgeSeconds("kaggle"), cfg.heartbeatMaxAgeS, Date.now, 0),
   };
   setDepsOverride(() => deps);
 
   return {
-    tg, repo, embedder, kaggle, workersAi, deps,
+    tg, repo, embedder, transcriber, kaggle, workersAi, deps,
     send: (update, secret = WEBHOOK_SECRET) =>
       (exports as unknown as { default: Fetcher }).default.fetch(new Request("https://bot.test/telegram/webhook", {
         method: "POST",
