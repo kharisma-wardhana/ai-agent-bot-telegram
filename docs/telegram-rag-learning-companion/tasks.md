@@ -6,7 +6,7 @@
 - [x] 2. Schema. Spec AC: #14, #17, #22
 - [x] 3. Repository layer + fakes. Spec AC: #14, #17
 - [x] 4. LLM router + embeddings. Spec AC: #18
-- [ ] 5. Python ingestion + seed CLI. Spec AC: #14, #22
+- [x] 5. Python ingestion + seed CLI. Spec AC: #14, #22
 - [ ] 6. Retrieval, grounding, length policy, persona prompt. Spec AC: #5, #6, #7, #8, #21
 - [ ] 7. Telegram client, update parsing, progress/streaming. Spec AC: #1, #3
 - [ ] 8. Webhook entry + DO pipeline + fallback + deep link. Spec AC: #1, #2, #3, #9, #12, #19
