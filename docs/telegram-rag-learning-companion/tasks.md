@@ -14,7 +14,7 @@
 - [x] 10. Sessions, feedback close, 24 h alarm. Spec AC: #15, #16
 - [x] 11. Voice + photo questions. Spec AC: #10, #11
 - [x] 12. Graph memory cron, recall, `/hapusdata`. Spec AC: #16, #17
-- [ ] 13. Skills + tools + tool loop. Spec AC: #15, #21
+- [x] 13. Skills + tools + tool loop. Spec AC: #15, #21
 - [ ] 14. MCP server. Spec AC: #19, #20
 - [ ] 15. Kaggle serving + ingest loop. Spec AC: #11, #14, #18, #19
 - [ ] 16. Evaluation harness. Spec AC: #4, #5, #6, #7, #8, #21

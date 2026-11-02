@@ -4,6 +4,8 @@ import { buildMessages, compressionMessages } from "../answer/prompts";
 import type { Backend, QuestionKind } from "../db/repository";
 import type { Deps } from "../deps";
 import { recallMemory } from "../memory/graph-store";
+import { selectSkill } from "../skills";
+import { runTool, TOOL_DEFS, type ToolContext } from "../tools";
 import { decide, sourceLine } from "../rag/grounding";
 import { retrieve } from "../rag/retrieve";
 import { TelegramError } from "../telegram/client";
@@ -20,6 +22,7 @@ export type AnswerOutcome =
   | { kind: "answer"; text: string; sources: string[]; backend: Backend | null }
   | { kind: "fallback"; reason: string };
 
+export const MAX_TOOL_ROUNDS = 2;
 const NOT_FOUND_GUARD = 12; // buffer this many chars before streaming, so a NOT_FOUND reply is never shown
 
 /** Retrieval → generation → grounding → length policy. Streams into `progress` when given. */
@@ -41,7 +44,8 @@ export async function answerQuestion(
 
   await a.progress?.stage("composing");
   const memoryNotes = await recallMemory(d, a.learnerId, r.embedding);
-  const messages = buildMessages({ question: a.question, chunks: r.chunks, history, memoryNotes, imageDataUrl: a.imageDataUrl, maxChars: d.cfg.maxAnswerChars });
+  const skill = selectSkill(a.question);
+  const messages = buildMessages({ question: a.question, chunks: r.chunks, history, memoryNotes, skillInstructions: skill.instructions, imageDataUrl: a.imageDataUrl, maxChars: d.cfg.maxAnswerChars });
 
   let buf = "";
   let streaming = false;
@@ -60,14 +64,27 @@ export async function answerQuestion(
     a.progress?.resetStream();
   };
 
-  const res = await d.router.chat({ messages, maxTokens: 600 }, Boolean(a.imageDataUrl), onDelta, onRetry);
-  const decision = decide(r.found || Boolean(a.imageDataUrl), r.chunks, res.content);
+  // Tool loop: at most MAX_TOOL_ROUNDS rounds of tool calls, then a final answer without tools.
+  const ctx: ToolContext = { d, learnerId: a.learnerId, escalated: false, extraSources: [] };
+  let res = await d.router.chat({ messages, tools: TOOL_DEFS, maxTokens: 600 }, Boolean(a.imageDataUrl), onDelta, onRetry);
+  for (let round = 1; res.toolCalls.length > 0; round++) {
+    onRetry(); // discard any streamed preamble from the tool-calling turn
+    messages.push({ role: "assistant", content: res.content, tool_calls: res.toolCalls });
+    for (const call of res.toolCalls.slice(0, 3)) messages.push({ role: "tool", tool_call_id: call.id, content: await runTool(call, ctx) });
+    if (ctx.escalated) return { kind: "fallback", reason: "model_escalated" };
+    const tools = round < MAX_TOOL_ROUNDS ? TOOL_DEFS : undefined;
+    res = await d.router.chat({ messages, tools, maxTokens: 600 }, Boolean(a.imageDataUrl), onDelta, onRetry);
+    if (!tools) break;
+  }
+
+  const decision = decide(r.found || Boolean(a.imageDataUrl) || ctx.extraSources.length > 0, r.chunks, res.content);
   if (decision.kind === "fallback") return { kind: "fallback", reason: decision.reason };
+  const sources = [...new Set([...decision.sources, ...ctx.extraSources])];
 
   const compress = async (text: string, target: number) =>
     (await d.router.chat({ messages: compressionMessages(text, target), maxTokens: 400 }, false)).content;
-  const text = await composeFinal(res.content, sourceLine(decision.sources), d.cfg.maxAnswerChars, compress);
-  return { kind: "answer", text, sources: decision.sources, backend: res.backend };
+  const text = await composeFinal(res.content, sourceLine(sources), d.cfg.maxAnswerChars, compress);
+  return { kind: "answer", text, sources, backend: res.backend };
 }
 
 export interface ResolvedQuestion { question: string; imageDataUrl?: string; kind: QuestionKind; photoFileId?: string }

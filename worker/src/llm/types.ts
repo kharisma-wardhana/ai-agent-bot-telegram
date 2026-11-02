@@ -14,6 +14,15 @@ export type ChatMessage =
   | { role: "assistant"; content: string; tool_calls?: ToolCall[] }
   | { role: "tool"; content: string; tool_call_id: string };
 
+/** OpenAI wire format: assistant tool calls become { id, type: "function", function: { name, arguments } }. */
+export function toWireMessages(msgs: ChatMessage[]): Record<string, unknown>[] {
+  return msgs.map((m) =>
+    m.role === "assistant" && m.tool_calls?.length
+      ? { role: "assistant", content: m.content, tool_calls: m.tool_calls.map((t) => ({ id: t.id, type: "function", function: { name: t.name, arguments: t.arguments } })) }
+      : { ...m },
+  );
+}
+
 export interface ToolDef {
   type: "function";
   function: { name: string; description: string; parameters: Record<string, unknown> };

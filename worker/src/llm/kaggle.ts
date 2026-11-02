@@ -1,5 +1,5 @@
 import { sseData, ToolCallAssembler } from "./sse";
-import { LlmError, type ChatRequest, type ChatResult, type LlmBackend, type OnDelta } from "./types";
+import { LlmError, toWireMessages, type ChatRequest, type ChatResult, type LlmBackend, type OnDelta } from "./types";
 
 export const KAGGLE_MODEL = "qwen3-vl-8b";
 export const KAGGLE_SECRET_HEADER = "X-Skilly-Secret";
@@ -24,7 +24,7 @@ export class KaggleBackend implements LlmBackend {
         headers: { "Content-Type": "application/json", [KAGGLE_SECRET_HEADER]: this.sharedSecret },
         body: JSON.stringify({
           model: KAGGLE_MODEL,
-          messages: req.messages,
+          messages: toWireMessages(req.messages),
           tools: req.tools && req.tools.length ? req.tools : undefined,
           max_tokens: req.maxTokens ?? 600,
           temperature: req.temperature ?? 0.3,

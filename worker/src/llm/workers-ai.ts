@@ -1,5 +1,5 @@
 import { sseData, ToolCallAssembler } from "./sse";
-import { LlmError, type AiBinding, type ChatMessage, type ChatRequest, type ChatResult, type Embedder, type LlmBackend, type OnDelta, type ToolCall } from "./types";
+import { LlmError, toWireMessages, type AiBinding, type ChatMessage, type ChatRequest, type ChatResult, type Embedder, type LlmBackend, type OnDelta, type ToolCall } from "./types";
 
 export const WORKERS_AI_CHAT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
 export const EMBED_MODEL = "@cf/baai/bge-m3";
@@ -13,7 +13,7 @@ export class WorkersAiBackend implements LlmBackend {
   constructor(private readonly ai: AiBinding) {}
 
   async chat(req: ChatRequest, onDelta?: OnDelta): Promise<ChatResult> {
-    const messages = req.messages.map(textOnly);
+    const messages = toWireMessages(req.messages.map(textOnly));
     const base = { messages, max_tokens: req.maxTokens ?? 600, temperature: req.temperature ?? 0.3 };
     try {
       if (req.tools && req.tools.length) {
