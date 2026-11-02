@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "./config";
 import { getDeps, type Deps } from "./deps";
+import { bearerOk, handleMcp } from "./mcp/server";
 import type { DeferredImage } from "./media/image";
 import { runMemoryJob } from "./memory/graph-extractor";
 import type { DeferredImageEvent, LearnerSession } from "./pipeline/learner-session";
@@ -44,6 +45,28 @@ app.post("/telegram/webhook", async (c) => {
   await learnerStub(c.env, event.from.id).enqueue(event);
   return c.json({ ok: true });
 });
+
+/** MCP endpoint for mentors (AC 19, 20). Stateless Streamable HTTP; no server-initiated stream. */
+app.post("/mcp", async (c) => {
+  const d = getDeps(c.env);
+  if (!bearerOk(c.req.header("Authorization"), d.cfg.mcpTokens, safeEqual)) {
+    return c.json(err401, 401, { "WWW-Authenticate": 'Bearer realm="mcp"' });
+  }
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }, 400);
+  }
+  if (Array.isArray(body)) {
+    const out = (await Promise.all(body.map((m) => handleMcp(d, m)))).filter(Boolean);
+    return out.length ? c.json(out) : c.body(null, 202);
+  }
+  const res = await handleMcp(d, body as Parameters<typeof handleMcp>[1]);
+  return res ? c.json(res) : c.body(null, 202);
+});
+app.get("/mcp", (c) => c.body(null, 405, { Allow: "POST" }));
+const err401 = { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Unauthorized" } };
 
 /** Re-queues image questions deferred while Kaggle was offline, once it is back (AC 11). */
 export async function deliverDeferredImages(d: Deps, env: Env): Promise<number> {
