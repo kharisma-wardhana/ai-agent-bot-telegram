@@ -1,4 +1,18 @@
 {
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./worker/.dev.vars)",
+      "Read(~/.wrangler/**)",
+      "Read(~/.config/.wrangler/**)",
+      "Read(~/.kaggle/**)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(curl:*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -11,6 +25,12 @@
         "matcher": "Edit|Write|NotebookEdit",
         "hooks": [
           { "type": "command", "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-tests.mjs\"" }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/deploy-gate.mjs\"" }
         ]
       }
     ]
