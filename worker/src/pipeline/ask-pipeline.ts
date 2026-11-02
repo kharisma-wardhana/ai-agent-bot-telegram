@@ -23,7 +23,28 @@ export type AnswerOutcome =
   | { kind: "fallback"; reason: string };
 
 export const MAX_TOOL_ROUNDS = 2;
-const NOT_FOUND_GUARD = 12; // buffer this many chars before streaming, so a NOT_FOUND reply is never shown
+const NOT_FOUND_GUARD = 12; // don't start streaming before this much visible text
+const NOT_FOUND_HOLDBACK = 9; // "NOT_FOUND".length: never show text a marker could still complete
+
+export const DESCRIBE_IMAGE_PROMPT =
+  "Deskripsikan gambar ini secara singkat dan faktual dalam Bahasa Indonesia (maksimal 200 karakter): topik, teks yang terlihat, dan jenis gambar. Jangan menjawab pertanyaan apa pun.";
+
+/** Short factual description of a photo, used only as a retrieval query. Empty on failure. */
+async function describeImage(d: Deps, imageDataUrl: string): Promise<string> {
+  try {
+    const res = await d.router.chat({
+      messages: [
+        { role: "system", content: DESCRIBE_IMAGE_PROMPT },
+        { role: "user", content: [{ type: "image_url", image_url: { url: imageDataUrl } }] },
+      ],
+      maxTokens: 120,
+      temperature: 0,
+    }, true);
+    return res.content.replace(/\s+/g, " ").trim().slice(0, 300);
+  } catch {
+    return "";
+  }
+} // buffer this many chars before streaming, so a NOT_FOUND reply is never shown
 
 /** Retrieval → generation → grounding → length policy. Streams into `progress` when given. */
 export async function answerQuestion(
@@ -38,29 +59,42 @@ export async function answerQuestion(
   // nothing, search with the session's previous question, which is the topic being followed up.
   const opts = { topK: d.cfg.retrievalTopK, threshold: d.cfg.retrievalThreshold };
   let r = await retrieve(a.question || "gambar", d.embedder, d.repo, opts);
+  if (!r.found && a.imageDataUrl) {
+    // Photos: retrieve on what the image shows, so a caption-less photo can still be grounded.
+    const description = await describeImage(d, a.imageDataUrl);
+    if (description) r = await retrieve(`${a.question}\n${description}`.trim(), d.embedder, d.repo, opts);
+  }
   const prevQuestion = [...history].reverse().find((t) => t.role === "user")?.content;
   if (!r.found && prevQuestion) r = await retrieve(prevQuestion, d.embedder, d.repo, opts);
-  if (!r.found && !a.imageDataUrl) return { kind: "fallback", reason: "low_similarity" };
+  if (!r.found) return { kind: "fallback", reason: "low_similarity" };
 
   await a.progress?.stage("composing");
   const memoryNotes = await recallMemory(d, a.learnerId, r.embedding);
   const skill = selectSkill(a.question);
   const messages = buildMessages({ question: a.question, chunks: r.chunks, history, memoryNotes, skillInstructions: skill.instructions, imageDataUrl: a.imageDataUrl, maxChars: d.cfg.maxAnswerChars });
 
+  // Streaming guard: hold back the last few characters (a marker may be arriving) and stop for good
+  // once NOT_FOUND appears anywhere, so the learner never sees it (review finding 1).
   let buf = "";
-  let streaming = false;
+  let shown = 0;
+  let stopped = false;
   const onDelta = async (fragment: string) => {
-    if (!a.progress) return;
-    if (streaming) return a.progress.stream(fragment);
+    if (!a.progress || stopped) return;
     buf += fragment;
-    const head = buf.trimStart();
-    if (head.length < NOT_FOUND_GUARD || head.toUpperCase().startsWith("NOT_FOUND")) return;
-    streaming = true;
-    await a.progress.stream(buf);
+    if (/NOT_FOUND/i.test(buf)) {
+      stopped = true;
+      a.progress.resetStream();
+      return;
+    }
+    const safe = buf.slice(0, Math.max(0, buf.length - NOT_FOUND_HOLDBACK));
+    if (safe.trimStart().length < NOT_FOUND_GUARD || safe.length <= shown) return;
+    await a.progress.stream(safe.slice(shown));
+    shown = safe.length;
   };
   const onRetry = () => {
     buf = "";
-    streaming = false;
+    shown = 0;
+    stopped = false;
     a.progress?.resetStream();
   };
 
@@ -77,9 +111,10 @@ export async function answerQuestion(
     if (!tools) break;
   }
 
-  const decision = decide(r.found || Boolean(a.imageDataUrl) || ctx.extraSources.length > 0, r.chunks, res.content);
+  const decision = decide(r.found || ctx.extraSources.length > 0, r.chunks, res.content);
   if (decision.kind === "fallback") return { kind: "fallback", reason: decision.reason };
   const sources = [...new Set([...decision.sources, ...ctx.extraSources])];
+  if (sources.length === 0) return { kind: "fallback", reason: "no_sources" }; // never an unsourced lesson answer (AC 7)
 
   const compress = async (text: string, target: number) =>
     (await d.router.chat({ messages: compressionMessages(text, target), maxTokens: 400 }, false)).content;

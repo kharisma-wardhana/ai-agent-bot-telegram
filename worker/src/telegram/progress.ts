@@ -79,7 +79,9 @@ export class ProgressMessage {
   render(): string {
     const head = this.stages.join("\n");
     if (!this.partial) return head;
-    const preview = this.partial.length > this.maxChars ? `${this.partial.slice(0, this.maxChars - 1)}…` : this.partial;
+    // The whole message, stage header included, stays within maxChars (AC 5).
+    const room = Math.max(0, this.maxChars - head.length - 2);
+    const preview = this.partial.length > room ? `${this.partial.slice(0, Math.max(0, room - 1))}…` : this.partial;
     return `${head}\n\n${preview}`;
   }
 

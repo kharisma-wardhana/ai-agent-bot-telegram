@@ -23,7 +23,7 @@ export function extractionMessages(s: MemorySession) {
   ];
 }
 
-const clean = (label: unknown) => (typeof label === "string" ? label.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 40) : "");
+const clean = (label: unknown) => (typeof label === "string" ? label.replace(/[<>]/g, "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 40) : "");
 
 /** Parses and validates the model's JSON. Anything malformed becomes an empty memory, never an exception. */
 export function parseExtraction(raw: string): { nodes: Omit<MemoryNodeInput, "embedding">[]; edges: MemoryEdgeInput[] } {

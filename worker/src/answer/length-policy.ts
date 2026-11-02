@@ -31,7 +31,8 @@ export async function enforceLength(body: string, max: number, compress?: Compre
   if (compress) {
     try {
       const c = (await compress(t, Math.min(COMPRESS_TARGET, max))).trim();
-      if (c) {
+      // Re-check: an empty or NOT_FOUND "summary" is discarded in favour of the hard cut.
+      if (c && !/NOT_FOUND/i.test(c)) {
         candidate = c;
         compressed = true;
       }

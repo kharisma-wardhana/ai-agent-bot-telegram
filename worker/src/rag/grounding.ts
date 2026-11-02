@@ -8,7 +8,8 @@ export const FALLBACK_TOPIC_TEXT = "Saya tidak punya data terkait pertanyaan ter
 /** The model was told to reply NOT_FOUND when the documents don't contain the answer. */
 export function modelSaysNotFound(answer: string): boolean {
   const t = answer.trim();
-  return t === "" || t.toUpperCase().includes(NOT_FOUND_MARKER);
+  // The marker opens or closes the reply ("NOT_FOUND", "…ternyata NOT_FOUND"); a mid-sentence mention is content.
+  return t === "" || new RegExp(`^\\W*${NOT_FOUND_MARKER}\\b|\\b${NOT_FOUND_MARKER}\\W*$`, "i").test(t);
 }
 
 export type GroundingDecision = { kind: "answer"; sources: string[] } | { kind: "fallback"; reason: "low_similarity" | "model_not_found" };

@@ -19,17 +19,20 @@ export class WorkersAiBackend implements LlmBackend {
       if (req.tools && req.tools.length) {
         // Tool calls: non-streaming is the reliably supported shape.
         const out = await this.ai.run(WORKERS_AI_CHAT_MODEL, { ...base, tools: req.tools });
-        const { content, toolCalls } = parseNonStream(out);
+        const parsed = parseNonStream(out);
+        const content = stripThink(parsed.content);
         if (content) await onDelta?.(content);
-        return { content, toolCalls, backend: "workers_ai" };
+        return { content, toolCalls: parsed.toolCalls, backend: "workers_ai" };
       }
       const out = await this.ai.run(WORKERS_AI_CHAT_MODEL, { ...base, stream: true });
       if (!(out instanceof ReadableStream)) {
-        const { content, toolCalls } = parseNonStream(out);
+        const parsed = parseNonStream(out);
+        const content = stripThink(parsed.content);
         if (content) await onDelta?.(content);
-        return { content, toolCalls, backend: "workers_ai" };
+        return { content, toolCalls: parsed.toolCalls, backend: "workers_ai" };
       }
       let content = "";
+      const think = new ThinkFilter();
       const tools = new ToolCallAssembler();
       for await (const data of sseData(out as ReadableStream<Uint8Array>)) {
         let chunk: { response?: string; choices?: { delta?: { content?: string; tool_calls?: [] } }[] };
@@ -38,18 +41,66 @@ export class WorkersAiBackend implements LlmBackend {
         } catch {
           continue;
         }
-        const piece = chunk.choices?.[0]?.delta?.content ?? chunk.response ?? "";
+        const piece = think.push(chunk.choices?.[0]?.delta?.content ?? chunk.response ?? "");
         tools.push(chunk.choices?.[0]?.delta?.tool_calls);
         if (piece) {
           content += piece;
           await onDelta?.(piece);
         }
       }
-      return { content, toolCalls: tools.calls(), backend: "workers_ai" };
+      const tail = think.flush();
+      if (tail) {
+        content += tail;
+        await onDelta?.(tail);
+      }
+      return { content: content.trimStart(), toolCalls: tools.calls(), backend: "workers_ai" };
     } catch (e) {
       if (e instanceof LlmError) throw e;
       throw new LlmError(`workers ai failed: ${(e as Error).message}`, "workers_ai");
     }
+  }
+}
+
+/** Removes Qwen3 `<think>…</think>` reasoning from a complete reply. */
+export function stripThink(text: string): string {
+  return text.replace(/<think>[\s\S]*?(<\/think>|$)/gi, "").trim();
+}
+
+/**
+ * Streaming version of stripThink: drops everything between <think> and </think>, even when the tags
+ * are split across fragments, by holding back any trailing text that could be the start of a tag.
+ */
+export class ThinkFilter {
+  private buf = "";
+  private inThink = false;
+
+  push(fragment: string): string {
+    this.buf += fragment;
+    let out = "";
+    for (;;) {
+      const tag = this.inThink ? "</think>" : "<think>";
+      const i = this.buf.toLowerCase().indexOf(tag);
+      if (i >= 0) {
+        if (!this.inThink) out += this.buf.slice(0, i);
+        this.buf = this.buf.slice(i + tag.length);
+        this.inThink = !this.inThink;
+        continue;
+      }
+      // Keep a possible partial tag at the end; emit the rest (unless inside a think block).
+      let keep = 0;
+      for (let k = Math.min(tag.length - 1, this.buf.length); k > 0; k--) {
+        if (tag.startsWith(this.buf.slice(-k).toLowerCase())) { keep = k; break; }
+      }
+      if (!this.inThink) out += this.buf.slice(0, this.buf.length - keep);
+      this.buf = this.buf.slice(this.buf.length - keep);
+      return out;
+    }
+  }
+
+  flush(): string {
+    const rest = this.inThink ? "" : this.buf;
+    this.buf = "";
+    return rest;
   }
 }
 

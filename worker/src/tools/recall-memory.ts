@@ -1,3 +1,4 @@
+import { sanitizeData } from "../answer/prompts";
 import { recallMemory } from "../memory/graph-store";
 import type { ToolContext } from "./index";
 
@@ -6,5 +7,5 @@ export async function recallMemoryTool(ctx: ToolContext, query: string): Promise
   if (!query) return "ERROR: query kosong.";
   const [embedding] = await ctx.d.embedder.embed([query]);
   const notes = embedding ? await recallMemory(ctx.d, ctx.learnerId, embedding) : [];
-  return notes.length ? `<memori>\n${notes.join("\n")}\n</memori>` : "<memori>\n(tidak ada)\n</memori>";
+  return notes.length ? `<memori>\n${notes.map(sanitizeData).join("\n")}\n</memori>` : "<memori>\n(tidak ada)\n</memori>";
 }
