@@ -10,7 +10,7 @@
 - [x] 6. Retrieval, grounding, length policy, persona prompt. Spec AC: #5, #6, #7, #8, #21
 - [x] 7. Telegram client, update parsing, progress/streaming. Spec AC: #1, #3
 - [x] 8. Webhook entry + DO pipeline + fallback + deep link. Spec AC: #1, #2, #3, #9, #12, #19
-- [ ] 9. `/add_knowledge`. Spec AC: #13, #14
+- [x] 9. `/add_knowledge`. Spec AC: #13, #14
 - [ ] 10. Sessions, feedback close, 24 h alarm. Spec AC: #15, #16
 - [ ] 11. Voice + photo questions. Spec AC: #10, #11
 - [ ] 12. Graph memory cron, recall, `/hapusdata`. Spec AC: #16, #17

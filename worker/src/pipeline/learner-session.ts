@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../config";
 import { getDeps, type Deps } from "../deps";
+import { handleAddKnowledge } from "../knowledge/add-knowledge";
 import type { BotEvent } from "../telegram/parse-update";
 import { handleAsk, handleStart, tryStartProgress } from "./ask-pipeline";
 
@@ -58,6 +59,8 @@ export class LearnerSession extends DurableObject<Env> {
       }
       case "start":
         return handleStart(d, e);
+      case "add_knowledge":
+        return handleAddKnowledge(d, e);
       default:
         return; // later slices: add_knowledge, feedback, dm_text, hapusdata
     }
