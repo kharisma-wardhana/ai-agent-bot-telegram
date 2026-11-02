@@ -43,10 +43,10 @@ All paths are new (empty repo).
 **Python ingestion + Kaggle (`ingest/`, `kaggle/`)**
 - `ingest/pyproject.toml` (uv), `ingest/src/ingest/parsers.py` (pdf/html/md/txt → text), `chunker.py`, `embedder.py` (Workers AI bge-m3 client behind an interface), `store.py` (Supabase writer behind an interface), `seed.py` (CLI: ingest `lesson-docs/`, idempotent by content hash)
 - `ingest/tests/`: unit + CLI integration tests with fake embedder/store
-- `kaggle/serve.py`: launches vLLM (Qwen3-VL-8B-Instruct, quantized, tool-call parser), auth proxy checking the shared secret, heartbeat loop
-- `kaggle/ingest_loop.py`: claims pending ingest jobs (pdf/html), runs `ingest` pipeline
-- `kaggle/notebook.ipynb`: thin launcher: installs, starts `serve.py`, `ingest_loop.py`, `cloudflared`
-- `kaggle/tests/`: auth-proxy and heartbeat tests
+- `kaggle/pyproject.toml` (uv; depends on `ingest` by path), `kaggle/src/skilly_kaggle/serve.py`: launches vLLM (Qwen3-VL-8B-Instruct, quantized, tool-call parser), auth proxy checking the shared secret, heartbeat loop *(amended, step 15: package layout under `src/skilly_kaggle/`)*
+- `kaggle/src/skilly_kaggle/ingest_loop.py`: claims pending ingest jobs (pdf/html), runs `ingest` pipeline, DMs the mentor the chunk count
+- `kaggle/notebook.ipynb`: thin launcher: secrets, installs (pinned), starts `serve`, `ingest_loop`, `cloudflared`
+- `kaggle/tests/`: auth-proxy, heartbeat and ingest-loop tests
 
 **Evaluation (`eval/`)**
 - `eval/questions.jsonl`: ≥ 30 in-scope (from lesson-docs) + ≥ 10 out-of-scope labelled questions, Indonesian + some English
@@ -89,7 +89,7 @@ All paths are new (empty repo).
 14. **MCP server**: `worker/src/mcp/server.ts`, `/mcp` route. Advances AC 19, 20.
 
 **Slice 9: Kaggle + evaluation + setup docs**
-15. **Kaggle serving + ingest loop**: `kaggle/*`. Advances AC 11, 14, 18, 19.
+15. **Kaggle serving + ingest loop**: `kaggle/*` (package under `kaggle/src/skilly_kaggle/`). Advances AC 11, 14, 18, 19.
 16. **Evaluation harness**: `eval/*`. Advances AC 4, 5, 6, 7, 8, 21.
 17. **Operator setup guide**: `docs/telegram-rag-learning-companion/setup.md`, `docs/index.md`. Supports deploy readiness.
 
