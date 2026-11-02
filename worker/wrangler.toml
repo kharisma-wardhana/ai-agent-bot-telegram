@@ -28,3 +28,11 @@ bucket_name = "skilly-knowledge"
 
 [triggers]
 crons = ["*/5 * * * *"]
+
+[[durable_objects.bindings]]
+name = "LEARNER_SESSION"
+class_name = "LearnerSession"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LearnerSession"]

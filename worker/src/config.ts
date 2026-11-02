@@ -1,6 +1,11 @@
 /** Runtime configuration parsed from Worker env vars and secrets. */
+import type { AiBinding } from "./llm/types";
 
 export interface Env {
+  // Bindings (wrangler.toml)
+  AI: AiBinding;
+  KNOWLEDGE_BUCKET: R2Bucket;
+  LEARNER_SESSION: DurableObjectNamespace;
   // Secrets (wrangler secret put …)
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_WEBHOOK_SECRET: string;

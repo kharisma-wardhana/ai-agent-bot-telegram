@@ -20,6 +20,7 @@ All paths are new (empty repo).
 - `worker/package.json`, `worker/tsconfig.json`, `worker/wrangler.toml` (DO, AI, R2 bindings; cron), `worker/vitest.config.ts` (workers-pool project + node project for DB tests), `worker/.dev.vars.example` (names only, no values)
 - `worker/src/index.ts`: Hono app: `POST /telegram/webhook`, `POST /mcp`, `scheduled()` cron, DO export
 - `worker/src/config.ts`: env parsing (group ID, mentor IDs, whitelist, thresholds)
+- `worker/src/deps.ts`: builds repo/Telegram/router/embedder from env; test seam to inject fakes *(amended during build, step 8)*
 - `worker/src/db/repository.ts`: repository interface + Supabase REST/RPC implementation
 - `worker/src/llm/types.ts`, `sse.ts` *(amended, step 4: shared SSE + tool-call assembly)*, `kaggle.ts`, `workers-ai.ts`, `router.ts`: OpenAI-compatible chat (stream + tools), heartbeat-based routing, embeddings (bge-m3)
 - `worker/src/rag/chunker.ts`, `retrieve.ts`, `grounding.ts`: text chunking, vector search, NOT_FOUND decision
@@ -67,7 +68,7 @@ All paths are new (empty repo).
 **Slice 2: Text #askAI → grounded DM → mentor fallback**
 6. **Retrieval, grounding, length policy, persona prompt**: `worker/src/rag/retrieve.ts`, `grounding.ts`, `worker/src/answer/*`. Advances AC 5, 6, 7, 8, 21.
 7. **Telegram client, update parsing, progress/streaming**: `worker/src/telegram/*`. Advances AC 1, 3.
-8. **Webhook entry + Durable Object pipeline (text) + fallback + deep link**: `worker/src/index.ts`, `worker/src/pipeline/*`. Advances AC 1, 2, 3, 9, 12, 19.
+8. **Webhook entry + Durable Object pipeline (text) + fallback + deep link**: `worker/src/index.ts`, `worker/src/deps.ts`, `worker/src/pipeline/*`, `worker/wrangler.toml` (DO binding), `worker/test/fakes/fake-llm.ts`, `worker/test/fakes/harness.ts`. Advances AC 1, 2, 3, 9, 12, 19.
 
 **Slice 3: Knowledge growth**
 9. **`/add_knowledge`**: `worker/src/knowledge/add-knowledge.ts`, route in `parse-update.ts`. Advances AC 13, 14.

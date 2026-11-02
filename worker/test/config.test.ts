@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ConfigError, parseConfig, type Env } from "../src/config";
 
-const base: Env = {
+const base = {
   TELEGRAM_BOT_TOKEN: "t",
   TELEGRAM_WEBHOOK_SECRET: "s",
   SUPABASE_SERVICE_KEY: "k",
@@ -13,7 +13,7 @@ const base: Env = {
   KNOWLEDGE_WHITELIST_IDS: "11",
   SUPABASE_URL: "https://x.supabase.co/",
   KAGGLE_BASE_URL: "https://kaggle.example.com/",
-};
+} as unknown as Env;
 
 describe("parseConfig", () => {
   it("parses a valid env with defaults", () => {
