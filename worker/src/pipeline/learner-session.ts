@@ -2,8 +2,9 @@ import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../config";
 import { getDeps, type Deps } from "../deps";
 import { handleAddKnowledge } from "../knowledge/add-knowledge";
+import { feedbackFromEvent, handleFeedback, isTextFeedback, sessionDeadline } from "../memory/session";
 import type { BotEvent } from "../telegram/parse-update";
-import { handleAsk, handleStart, tryStartProgress } from "./ask-pipeline";
+import { handleAsk, handleQuestion, handleStart, tryStartProgress } from "./ask-pipeline";
 
 type QueuedEvent = Exclude<BotEvent, { kind: "ignore" }>;
 const BUSY_STALE_MS = 5 * 60_000;
@@ -11,14 +12,14 @@ const BUSY_STALE_MS = 5 * 60_000;
 /**
  * One instance per learner (idFromName(telegram user id)). The webhook enqueues and returns at once;
  * the alarm drains the queue in order, so a learner's messages are handled one at a time and survive
- * the webhook returning. Errors are logged per event, never rethrown, so an alarm retry can't
- * double-send messages.
+ * the webhook returning. The same alarm then waits for the session TTL (24 h after last activity).
+ * Errors are logged per event, never rethrown, so an alarm retry can't double-send messages.
  */
 export class LearnerSession extends DurableObject<Env> {
   async enqueue(event: QueuedEvent): Promise<void> {
     const queue = (await this.ctx.storage.get<QueuedEvent[]>("queue")) ?? [];
     queue.push(event);
-    await this.ctx.storage.put("queue", queue);
+    await this.ctx.storage.put({ queue, learnerId: event.from.id });
     await this.ctx.storage.setAlarm(Date.now());
   }
 
@@ -39,8 +40,23 @@ export class LearnerSession extends DurableObject<Env> {
           console.error(`event ${next.kind} failed`, (e as Error).message);
         }
       }
+      await this.scheduleExpiry(d);
     } finally {
       await this.ctx.storage.put("busy", 0);
+    }
+  }
+
+  /** Expires the session once idle past the TTL; otherwise sets the alarm for that moment (AC 16). */
+  private async scheduleExpiry(d: Deps): Promise<void> {
+    const learnerId = await this.ctx.storage.get<number>("learnerId");
+    if (learnerId === undefined) return;
+    try {
+      const deadline = await sessionDeadline(d, learnerId);
+      if (deadline === null) return;
+      if (deadline <= Date.now()) await d.repo.expireSessions(d.cfg.sessionTtlHours);
+      else await this.ctx.storage.setAlarm(deadline);
+    } catch (e) {
+      console.error("session expiry check failed", (e as Error).message);
     }
   }
 
@@ -57,12 +73,26 @@ export class LearnerSession extends DurableObject<Env> {
         await handleAsk(d, e, { question: e.question, kind: "text" }, progress);
         return;
       }
+      case "dm_text": {
+        if (await isTextFeedback(d, e)) {
+          await handleFeedback(d, e.from.id, "text", e.text.slice(0, 500));
+          return;
+        }
+        const progress = await tryStartProgress(d, e.from.id);
+        await handleQuestion(d, e.from, null, { question: e.text, kind: "text" }, progress);
+        return;
+      }
+      case "feedback": {
+        const f = feedbackFromEvent(e);
+        await handleFeedback(d, e.from.id, f.kind, f.value, f.callbackId);
+        return;
+      }
       case "start":
         return handleStart(d, e);
       case "add_knowledge":
         return handleAddKnowledge(d, e);
       default:
-        return; // later slices: add_knowledge, feedback, dm_text, hapusdata
+        return; // later slices: hapusdata
     }
   }
 }

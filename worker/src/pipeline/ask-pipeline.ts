@@ -8,6 +8,7 @@ import { retrieve } from "../rag/retrieve";
 import { TelegramError } from "../telegram/client";
 import type { BotEvent } from "../telegram/parse-update";
 import { FEEDBACK_KEYBOARD, ProgressMessage } from "../telegram/progress";
+import type { TgUser } from "../telegram/types";
 import { runFallback } from "./fallback";
 
 export const LEARNER_FALLBACK_DM = "Maaf, materi untuk pertanyaan ini belum ada di dokumen kelas. Pertanyaanmu sudah aku teruskan ke mentor ya. 🙏";
@@ -28,11 +29,16 @@ export async function answerQuestion(
   if (!a.imageDataUrl && isIdentityQuestion(a.question)) return { kind: "answer", text: PERSONA_INTRO, sources: [], backend: null };
 
   await a.progress?.stage("searching");
-  const r = await retrieve(a.question || "gambar", d.embedder, d.repo, { topK: d.cfg.retrievalTopK, threshold: d.cfg.retrievalThreshold });
+  const history = await d.repo.getTurns(a.sessionId, 6);
+  // Follow-ups ("jelaskan lebih sederhana") carry little searchable text: if the question alone finds
+  // nothing, search with the session's previous question, which is the topic being followed up.
+  const opts = { topK: d.cfg.retrievalTopK, threshold: d.cfg.retrievalThreshold };
+  let r = await retrieve(a.question || "gambar", d.embedder, d.repo, opts);
+  const prevQuestion = [...history].reverse().find((t) => t.role === "user")?.content;
+  if (!r.found && prevQuestion) r = await retrieve(prevQuestion, d.embedder, d.repo, opts);
   if (!r.found && !a.imageDataUrl) return { kind: "fallback", reason: "low_similarity" };
 
   await a.progress?.stage("composing");
-  const history = await d.repo.getTurns(a.sessionId, 6);
   const messages = buildMessages({ question: a.question, chunks: r.chunks, history, imageDataUrl: a.imageDataUrl, maxChars: d.cfg.maxAnswerChars });
 
   let buf = "";
@@ -62,11 +68,18 @@ export async function answerQuestion(
   return { kind: "answer", text, sources: decision.sources, backend: res.backend };
 }
 
-/** Group #askAI → DM answer (or deep link + held answer) or mentor fallback. */
-export async function handleAsk(d: Deps, e: Extract<BotEvent, { kind: "ask" }>, resolved: { question: string; imageDataUrl?: string; kind: QuestionKind; photoFileId?: string }, progress: ProgressMessage | null): Promise<void> {
-  const learner = await d.repo.upsertLearner({ telegramId: e.from.id, displayName: e.from.first_name, username: e.from.username ?? null, started: false });
+export interface ResolvedQuestion { question: string; imageDataUrl?: string; kind: QuestionKind; photoFileId?: string }
+export interface Origin { chatId: number; threadId: number | null; messageId: number }
+
+/**
+ * A question from the group (#askAI, origin set) or a DM follow-up (origin null) → DM answer,
+ * deep link + held answer when the learner can't be DMed, or mentor fallback.
+ */
+export async function handleQuestion(d: Deps, from: TgUser, origin: Origin | null, resolved: ResolvedQuestion, progress: ProgressMessage | null): Promise<void> {
+  const learner = await d.repo.upsertLearner({ telegramId: from.id, displayName: from.first_name, username: from.username ?? null, started: origin === null });
   const open = await d.repo.getOpenSession(learner.telegramId);
-  const sessionId = open?.id ?? (await d.repo.openSession({ learnerId: learner.telegramId, chatId: e.chatId, threadId: e.threadId, messageId: e.messageId }));
+  const sessionId = open?.id ?? (await d.repo.openSession({ learnerId: learner.telegramId, chatId: origin?.chatId ?? null, threadId: origin?.threadId ?? null, messageId: origin?.messageId ?? null }));
+  const e = { from, chatId: origin?.chatId ?? null, threadId: origin?.threadId ?? null, messageId: origin?.messageId ?? null };
 
   let outcome: AnswerOutcome;
   try {
@@ -93,7 +106,13 @@ export async function handleAsk(d: Deps, e: Extract<BotEvent, { kind: "ask" }>, 
   }
   // Learner can't be DMed yet: hold the answer and post a deep link in the topic (AC 12).
   const pendingId = await d.repo.holdAnswer(learner.telegramId, sessionId, "not_started", { text: outcome.text });
-  await d.tg.sendMessage(e.chatId, START_NOTICE(d.cfg.botUsername, `q_${pendingId}`), { threadId: e.threadId ?? undefined, replyTo: e.messageId });
+  if (e.chatId === null) return;
+  await d.tg.sendMessage(e.chatId, START_NOTICE(d.cfg.botUsername, `q_${pendingId}`), { threadId: e.threadId ?? undefined, replyTo: e.messageId ?? undefined });
+}
+
+/** Group #askAI entry point. */
+export function handleAsk(d: Deps, e: Extract<BotEvent, { kind: "ask" }>, resolved: ResolvedQuestion, progress: ProgressMessage | null): Promise<void> {
+  return handleQuestion(d, e.from, { chatId: e.chatId, threadId: e.threadId, messageId: e.messageId }, resolved, progress);
 }
 
 /** Opens the progress DM; null when the learner hasn't started the bot (403). */
