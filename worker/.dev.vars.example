@@ -1,0 +1,6 @@
+# Copy to .dev.vars for `wrangler dev`. Names only — fill values locally, never commit .dev.vars.
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
+SUPABASE_SERVICE_KEY=
+KAGGLE_SHARED_SECRET=
+MCP_TOKENS=

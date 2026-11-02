@@ -2,7 +2,7 @@
 *Author: Kharisma Wardhana. Stage: Build. Written: 2026-11-02. Via /aspec:make-it-simple-v2.*
 *Implements: docs/telegram-rag-learning-companion/plan.md*
 
-- [ ] 1. Scaffold. Spec AC: foundation for all
+- [x] 1. Scaffold. Spec AC: foundation for all
 - [ ] 2. Schema. Spec AC: #14, #17, #22
 - [ ] 3. Repository layer + fakes. Spec AC: #14, #17
 - [ ] 4. LLM router + embeddings. Spec AC: #18

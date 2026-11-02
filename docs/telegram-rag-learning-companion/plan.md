@@ -56,7 +56,7 @@ All paths are new (empty repo).
 
 ## Work sequence
 **Slice 1: Foundations**
-1. **Scaffold**: `.gitignore`, root `package.json`/`pnpm-workspace.yaml`, `worker/package.json`, `tsconfig.json`, `wrangler.toml`, `vitest.config.ts`, `.dev.vars.example`, `worker/src/config.ts`, `ingest/pyproject.toml`. Supports all ACs.
+1. **Scaffold**: `.gitignore`, root `package.json`/`pnpm-workspace.yaml`/`pnpm-lock.yaml`, `worker/package.json`, `tsconfig.json`, `wrangler.toml`, `vitest.config.ts`, `.dev.vars.example`, `worker/src/config.ts`, `worker/src/index.ts` (health-route stub only, needed as the test runner's entry; step 8 fills it), `ingest/pyproject.toml`. Supports all ACs. *(Amended during build: index.ts stub moved forward from step 8.)*
 2. **Schema**: `db/migrations/0001_init.sql`, `0002_functions.sql`. Advances AC 14, 17, 22.
 3. **Repository layer + fakes**: `worker/src/db/repository.ts`, `worker/test/fakes/*`. Advances AC 14, 17.
 4. **LLM router + embeddings**: `worker/src/llm/*`. Advances AC 18.

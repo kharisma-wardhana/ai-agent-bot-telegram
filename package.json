@@ -1,0 +1,8 @@
+{
+  "name": "ibm-skillbuild-ai",
+  "private": true,
+  "packageManager": "pnpm@12.6.0",
+  "scripts": {
+    "test": "pnpm -C worker test"
+  }
+}
