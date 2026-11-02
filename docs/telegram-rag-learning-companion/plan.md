@@ -21,7 +21,7 @@ All paths are new (empty repo).
 - `worker/src/index.ts`: Hono app: `POST /telegram/webhook`, `POST /mcp`, `scheduled()` cron, DO export
 - `worker/src/config.ts`: env parsing (group ID, mentor IDs, whitelist, thresholds)
 - `worker/src/db/repository.ts`: repository interface + Supabase REST/RPC implementation
-- `worker/src/llm/types.ts`, `kaggle.ts`, `workers-ai.ts`, `router.ts`: OpenAI-compatible chat (stream + tools), heartbeat-based routing, embeddings (bge-m3)
+- `worker/src/llm/types.ts`, `sse.ts` *(amended, step 4: shared SSE + tool-call assembly)*, `kaggle.ts`, `workers-ai.ts`, `router.ts`: OpenAI-compatible chat (stream + tools), heartbeat-based routing, embeddings (bge-m3)
 - `worker/src/rag/chunker.ts`, `retrieve.ts`, `grounding.ts`: text chunking, vector search, NOT_FOUND decision
 - `worker/src/answer/length-policy.ts`, `persona.ts`, `prompts.ts`: 1000-char enforcement, Kak Skilly system prompt, prompt assembly with retrieved text wrapped as data
 - `worker/src/telegram/types.ts`, `client.ts`, `parse-update.ts`, `progress.ts`: Bot API calls, update classification (#askAI / command / feedback / reaction / start-deeplink), staged progress + throttled streaming
