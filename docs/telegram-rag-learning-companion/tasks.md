@@ -3,7 +3,7 @@
 *Implements: docs/telegram-rag-learning-companion/plan.md*
 
 - [x] 1. Scaffold. Spec AC: foundation for all
-- [ ] 2. Schema. Spec AC: #14, #17, #22
+- [x] 2. Schema. Spec AC: #14, #17, #22
 - [ ] 3. Repository layer + fakes. Spec AC: #14, #17
 - [ ] 4. LLM router + embeddings. Spec AC: #18
 - [ ] 5. Python ingestion + seed CLI. Spec AC: #14, #22

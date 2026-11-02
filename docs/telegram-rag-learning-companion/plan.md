@@ -36,6 +36,7 @@ All paths are new (empty repo).
 - `worker/src/mcp/server.ts`: authenticated MCP endpoint exposing the three tools
 - `worker/test/fakes/`: fake repository, fake Telegram, fake LLM/embeddings, Telegram update fixtures
 - `worker/test/**/*.test.ts`: tests listed per step under Test coverage
+- `worker/test/db/helpers.ts`, `worker/test/db/tsconfig.json`: PGlite + pgvector test harness (Node types kept out of the Worker tsconfig) *(amended during build, step 2)*
 
 **Python ingestion + Kaggle (`ingest/`, `kaggle/`)**
 - `ingest/pyproject.toml` (uv), `ingest/src/ingest/parsers.py` (pdf/html/md/txt → text), `chunker.py`, `embedder.py` (Workers AI bge-m3 client behind an interface), `store.py` (Supabase writer behind an interface), `seed.py` (CLI: ingest `lesson-docs/`, idempotent by content hash)

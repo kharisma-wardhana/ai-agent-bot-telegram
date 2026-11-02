@@ -3,13 +3,24 @@
     "target": "es2022",
     "module": "es2022",
     "moduleResolution": "bundler",
-    "lib": ["es2022"],
-    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"],
+    "lib": [
+      "es2022"
+    ],
+    "types": [
+      "@cloudflare/workers-types",
+      "@cloudflare/vitest-plugin/types"
+    ],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "test"]
+  "include": [
+    "src",
+    "test"
+  ],
+  "exclude": [
+    "test/db"
+  ]
 }
