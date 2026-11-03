@@ -13,7 +13,7 @@ Read these first — they are the project's foundation documents:
 |---|---|
 | Install | `pnpm install` · `uv sync --project ingest` |
 | Run locally | `pnpm -C worker dev` (wrangler dev, local only) |
-| Test | `pnpm -C worker test` · `uv run --project ingest pytest` · `uv run --project kaggle pytest` |
+| Test | `pnpm -C worker test` · `pnpm -C worker test:e2e` · `uv run --project ingest pytest` · `uv run --project kaggle pytest` |
 | Lint / format | `pnpm -C worker lint` · `pnpm -C worker format` |
 | Build / typecheck | `pnpm -C worker typecheck` |
 
@@ -32,6 +32,7 @@ in `docs/<feature-name>/`. Whenever a feature is added or changed, update
 
 ## Test scope
 - Backend, no UI: integration test at the real entry point (webhook, cron `scheduled()`, `/mcp`, seed CLI) — no e2e/Playwright.
+- Web UI (`/dashboard`): Playwright e2e on the main flows, against `worker/e2e/server.ts` with fakes, no network.
 - Roles/permissions: authN + authZ integration tests (webhook secret, add_knowledge whitelist, MCP token, tunnel secret, /hapusdata scope).
 - Database: regression test (PGlite + pgvector) whenever a step changes schema or a query.
 - Agent config: `.claude/hooks/eval.sh` re-run whenever `CLAUDE.md`, `.claude/agents/*` or a hook changes (CI job deferred — no CI).
