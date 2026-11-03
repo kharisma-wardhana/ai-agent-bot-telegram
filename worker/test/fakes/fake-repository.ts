@@ -1,6 +1,7 @@
 import type {
   Backend, ChunkMatch, KnowledgeChunkInput, KnowledgeSourceInput, Learner, MemoryEdge, MemoryEdgeInput, MemoryMatch,
   MemoryNodeInput, MemorySession, OpenSession, PendingAnswer, PendingReason, Repository, Turn, TurnInput,
+  ClosedFollowup, DashboardUser, DmDelivery, FollowupKnowledgeInfo, FollowupTab, FollowupView, TopicDelivery,
 } from "../../src/db/repository";
 
 const cos = (a: number[], b: number[]) => {
@@ -8,6 +9,14 @@ const cos = (a: number[], b: number[]) => {
   for (let i = 0; i < a.length; i++) { d += a[i]! * b[i]!; na += a[i]! ** 2; nb += b[i]! ** 2; }
   return na && nb ? d / Math.sqrt(na * nb) : 0;
 };
+
+/** Mirrors a mentor_followups row (0001 + 0004 columns). */
+export interface FakeFollowup {
+  id: number; sessionId: string; question: string; mentorIds: number[]; at: Date; visible: boolean; photoFileId: string | null;
+  status: "open" | "claimed" | "closed" | "resolved"; claimedByEmail: string | null; claimedByName: string | null; claimedAt: Date | null;
+  replyText: string | null; repliedByName: string | null; repliedAt: Date | null;
+  dmStatus: DmDelivery | null; topicStatus: TopicDelivery | null; knowledgeSourceId: string | null;
+}
 
 interface SessionRec { id: string; learnerId: number; chatId: number | null; threadId: number | null; messageId: number | null; status: "open" | "closed_feedback" | "expired"; memory: "pending" | "done"; lastActivityAt: Date }
 
@@ -19,7 +28,10 @@ export class FakeRepository implements Repository {
   sessions: SessionRec[] = [];
   turns: (TurnInput & { createdAt: Date })[] = [];
   feedback: { sessionId: string; kind: string; value: string }[] = [];
-  followups: { sessionId: string; question: string; mentorIds: number[]; at: Date }[] = [];
+  followups: FakeFollowup[] = [];
+  dashboardUsers: (DashboardUser & { removedAt: Date | null })[] = [];
+  loginTokens: { tokenHash: string; email: string; createdAt: Date; expiresAt: Date; usedAt: Date | null }[] = [];
+  dashSessions: { sessionHash: string; csrfHash: string; email: string; expiresAt: Date; revokedAt: Date | null }[] = [];
   pending: (PendingAnswer & { delivered: boolean })[] = [];
   ingestJobs: { id: string; r2Key: string; fileName: string; sourceType: string; requestedBy: number }[] = [];
   heartbeatAge: number | null = null;
@@ -90,7 +102,7 @@ export class FakeRepository implements Repository {
   }
 
   async addFollowup(sessionId: string, question: string, mentorIds: number[]) {
-    this.followups.push({ sessionId, question, mentorIds, at: new Date() });
+    await this.addFollowupV2(sessionId, question, mentorIds, null);
   }
 
   async countRecentEscalations(learnerId: number, minutes: number) {
@@ -178,5 +190,142 @@ export class FakeRepository implements Repository {
     this.memoryEdges = this.memoryEdges.filter((e) => e.learnerId !== learnerId);
     this.learners.delete(learnerId);
     return ids.size;
+  }
+
+  // ---------- Mentor dashboard (mirrors db/migrations/0004) ----------
+  private fid = 0;
+  private uidSeq = 0;
+  private liveClaim = (f: FakeFollowup, ttlS: number) => f.status === "claimed" && f.claimedAt !== null && f.claimedAt.getTime() >= Date.now() - ttlS * 1000;
+
+  async addFollowupV2(sessionId: string, question: string, mentorIds: number[], photoFileId: string | null) {
+    const id = ++this.fid;
+    this.followups.push({
+      id, sessionId, question, mentorIds, at: new Date(), visible: true, photoFileId, status: "open",
+      claimedByEmail: null, claimedByName: null, claimedAt: null, replyText: null, repliedByName: null, repliedAt: null,
+      dmStatus: null, topicStatus: null, knowledgeSourceId: null,
+    });
+    return id;
+  }
+
+  async setFollowupNotified(id: number, mentorIds: number[]) {
+    const f = this.followups.find((x) => x.id === id);
+    if (f) f.mentorIds = mentorIds;
+  }
+
+  async listDashboardUsers(): Promise<DashboardUser[]> {
+    return this.dashboardUsers.filter((u) => !u.removedAt).map(({ removedAt: _r, ...u }) => u);
+  }
+
+  async addDashboardUser(u: { email: string; displayName: string; telegramId: number; addedByEmail: string }) {
+    const email = u.email.trim().toLowerCase();
+    if (this.dashboardUsers.some((x) => x.email === email && !x.removedAt)) return null;
+    const id = ++this.uidSeq;
+    this.dashboardUsers.push({ id, email, displayName: u.displayName, telegramId: u.telegramId, addedByEmail: u.addedByEmail, createdAt: new Date(), removedAt: null });
+    return id;
+  }
+
+  async removeDashboardUser(id: number) {
+    const u = this.dashboardUsers.find((x) => x.id === id && !x.removedAt);
+    if (!u) return null;
+    u.removedAt = new Date();
+    for (const s of this.dashSessions) if (s.email === u.email && !s.revokedAt) s.revokedAt = new Date();
+    for (const t of this.loginTokens) if (t.email === u.email && !t.usedAt) t.usedAt = new Date();
+    return u.email;
+  }
+
+  async issueLoginToken(email: string, tokenHash: string, ttlS: number, max: number, windowS: number) {
+    const now = Date.now();
+    this.loginTokens = this.loginTokens.filter((t) => t.createdAt.getTime() >= now - 24 * 3600_000);
+    if (this.loginTokens.filter((t) => t.email === email && t.createdAt.getTime() > now - windowS * 1000).length >= max) return false;
+    this.loginTokens.push({ tokenHash, email, createdAt: new Date(now), expiresAt: new Date(now + ttlS * 1000), usedAt: null });
+    return true;
+  }
+
+  async consumeLoginToken(tokenHash: string) {
+    const t = this.loginTokens.find((x) => x.tokenHash === tokenHash && !x.usedAt && x.expiresAt.getTime() > Date.now());
+    if (!t) return null;
+    t.usedAt = new Date();
+    return t.email;
+  }
+
+  async createDashboardSession(sessionHash: string, csrfHash: string, email: string, ttlS: number) {
+    this.dashSessions.push({ sessionHash, csrfHash, email, expiresAt: new Date(Date.now() + ttlS * 1000), revokedAt: null });
+  }
+
+  async getDashboardSession(sessionHash: string) {
+    const s = this.dashSessions.find((x) => x.sessionHash === sessionHash && !x.revokedAt && x.expiresAt.getTime() > Date.now());
+    return s ? { email: s.email, csrfHash: s.csrfHash } : null;
+  }
+
+  async revokeDashboardSession(sessionHash: string) {
+    const s = this.dashSessions.find((x) => x.sessionHash === sessionHash && !x.revokedAt);
+    if (s) s.revokedAt = new Date();
+  }
+
+  async listFollowups(tab: FollowupTab, claimTtlS: number): Promise<FollowupView[]> {
+    return this.followups
+      .filter((f) => f.visible)
+      .map((f): FollowupView => {
+        const live = this.liveClaim(f, claimTtlS);
+        const status = f.status === "resolved" || f.status === "closed" ? "closed" : live ? "claimed" : "open";
+        const s = this.sessions.find((x) => x.id === f.sessionId);
+        return {
+          id: f.id, question: f.question, hasPhoto: f.photoFileId !== null, threadId: s?.threadId ?? null, viaDm: (s?.chatId ?? null) === null,
+          createdAt: f.at, status, claimedByEmail: live ? f.claimedByEmail : null, claimedByName: live ? f.claimedByName : null,
+          replyText: f.replyText, repliedByName: f.repliedByName, repliedAt: f.repliedAt, dmStatus: f.dmStatus, topicStatus: f.topicStatus,
+          knowledgeSourceId: f.knowledgeSourceId,
+        };
+      })
+      .filter((v) => (tab === "closed" ? v.status === "closed" : v.status !== "closed"))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
+  }
+
+  async followupPhoto(id: number) {
+    return this.followups.find((f) => f.id === id && f.visible)?.photoFileId ?? null;
+  }
+
+  async claimFollowup(id: number, email: string, name: string, claimTtlS: number) {
+    const f = this.followups.find((x) => x.id === id && x.visible);
+    if (f && (f.status === "open" || (f.status === "claimed" && !this.liveClaim(f, claimTtlS)))) {
+      Object.assign(f, { status: "claimed", claimedByEmail: email, claimedByName: name, claimedAt: new Date() });
+      return { claimed: true, claimedByName: name };
+    }
+    return { claimed: false, claimedByName: f?.claimedByName ?? null };
+  }
+
+  async releaseFollowup(id: number, email: string) {
+    const f = this.followups.find((x) => x.id === id && x.status === "claimed" && x.claimedByEmail === email);
+    if (!f) return false;
+    Object.assign(f, { status: "open", claimedByEmail: null, claimedByName: null, claimedAt: null });
+    return true;
+  }
+
+  async closeFollowup(id: number, email: string, name: string, reply: string, claimTtlS: number): Promise<ClosedFollowup | null> {
+    const f = this.followups.find((x) => x.id === id && x.claimedByEmail === email && this.liveClaim(x, claimTtlS));
+    if (!f) return null;
+    Object.assign(f, { status: "closed", replyText: reply, repliedByName: name, repliedAt: new Date() });
+    const s = this.sessions.find((x) => x.id === f.sessionId)!;
+    const l = this.learners.get(s.learnerId);
+    return {
+      sessionId: f.sessionId, question: f.question, learnerId: s.learnerId, learnerName: l?.displayName ?? null, learnerStarted: l?.hasStarted ?? false,
+      originChatId: s.chatId, originThreadId: s.threadId, originMessageId: s.messageId,
+    };
+  }
+
+  async setFollowupDelivery(id: number, dm: DmDelivery, topic: TopicDelivery) {
+    const f = this.followups.find((x) => x.id === id);
+    if (f) Object.assign(f, { dmStatus: dm, topicStatus: topic });
+  }
+
+  async followupForKnowledge(id: number): Promise<FollowupKnowledgeInfo | null> {
+    const f = this.followups.find((x) => x.id === id && x.visible);
+    return f ? { status: f.status, question: f.question, replyText: f.replyText, knowledgeSourceId: f.knowledgeSourceId } : null;
+  }
+
+  async setFollowupKnowledge(id: number, sourceId: string) {
+    const f = this.followups.find((x) => x.id === id && x.status === "closed" && x.knowledgeSourceId === null);
+    if (!f) return false;
+    f.knowledgeSourceId = sourceId;
+    return true;
   }
 }

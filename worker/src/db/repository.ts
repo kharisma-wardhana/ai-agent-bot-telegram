@@ -92,6 +92,26 @@ export interface MemoryEdgeInput { from: { kind: string; label: string }; relati
 export interface MemoryMatch { id: number; kind: string; label: string; weight: number; similarity: number }
 export interface MemoryEdge { fromLabel: string; relation: string; toLabel: string; weight: number }
 
+// ---------- Mentor dashboard (docs/mentor-followup-dashboard) ----------
+export type FollowupTab = "active" | "closed";
+export type FollowupStatus = "open" | "claimed" | "closed";
+export type DmDelivery = "sent" | "held" | "failed";
+export type TopicDelivery = "sent" | "failed" | "skipped";
+/** What the dashboard may show about a follow-up. Deliberately carries no learner identity (spec AC 9). */
+export interface FollowupView {
+  id: number; question: string; hasPhoto: boolean; threadId: number | null; viaDm: boolean; createdAt: Date;
+  status: FollowupStatus; claimedByEmail: string | null; claimedByName: string | null;
+  replyText: string | null; repliedByName: string | null; repliedAt: Date | null;
+  dmStatus: DmDelivery | null; topicStatus: TopicDelivery | null; knowledgeSourceId: string | null;
+}
+/** Server-side only: what reply delivery needs. Never rendered. */
+export interface ClosedFollowup {
+  sessionId: string; question: string; learnerId: number; learnerName: string | null; learnerStarted: boolean;
+  originChatId: number | null; originThreadId: number | null; originMessageId: number | null;
+}
+export interface DashboardUser { id: number; email: string; displayName: string; telegramId: number; addedByEmail: string; createdAt: Date }
+export interface FollowupKnowledgeInfo { status: string; question: string; replyText: string | null; knowledgeSourceId: string | null }
+
 /** Interface the rest of the Worker depends on (fakes implement it in tests). */
 export interface Repository {
   matchChunks(embedding: number[], topK: number, minSimilarity: number): Promise<ChunkMatch[]>;
@@ -115,6 +135,25 @@ export interface Repository {
   matchMemory(learnerId: number, embedding: number[], k: number): Promise<MemoryMatch[]>;
   memoryEdgesFor(learnerId: number, nodeIds: number[]): Promise<MemoryEdge[]>;
   deleteLearnerData(learnerId: number): Promise<number>;
+  // Mentor dashboard
+  addFollowupV2(sessionId: string, question: string, mentorIds: number[], photoFileId: string | null): Promise<number>;
+  setFollowupNotified(id: number, mentorIds: number[]): Promise<void>;
+  listDashboardUsers(): Promise<DashboardUser[]>;
+  addDashboardUser(u: { email: string; displayName: string; telegramId: number; addedByEmail: string }): Promise<number | null>;
+  removeDashboardUser(id: number): Promise<string | null>;
+  issueLoginToken(email: string, tokenHash: string, ttlS: number, max: number, windowS: number): Promise<boolean>;
+  consumeLoginToken(tokenHash: string): Promise<string | null>;
+  createDashboardSession(sessionHash: string, csrfHash: string, email: string, ttlS: number): Promise<void>;
+  getDashboardSession(sessionHash: string): Promise<{ email: string; csrfHash: string } | null>;
+  revokeDashboardSession(sessionHash: string): Promise<void>;
+  listFollowups(tab: FollowupTab, claimTtlS: number): Promise<FollowupView[]>;
+  followupPhoto(id: number): Promise<string | null>;
+  claimFollowup(id: number, email: string, name: string, claimTtlS: number): Promise<{ claimed: boolean; claimedByName: string | null }>;
+  releaseFollowup(id: number, email: string): Promise<boolean>;
+  closeFollowup(id: number, email: string, name: string, reply: string, claimTtlS: number): Promise<ClosedFollowup | null>;
+  setFollowupDelivery(id: number, dm: DmDelivery, topic: TopicDelivery): Promise<void>;
+  followupForKnowledge(id: number): Promise<FollowupKnowledgeInfo | null>;
+  setFollowupKnowledge(id: number, sourceId: string): Promise<boolean>;
 }
 
 const vec = (v: number[]) => `[${v.join(",")}]`;
@@ -243,5 +282,113 @@ export class RpcRepository implements Repository {
   async deleteLearnerData(learnerId: number): Promise<number> {
     const [r] = await this.rpc.call("delete_learner_data", { p_learner: learnerId });
     return Number(r?.delete_learner_data ?? 0);
+  }
+
+  // ---------- Mentor dashboard ----------
+  async addFollowupV2(sessionId: string, question: string, mentorIds: number[], photoFileId: string | null): Promise<number> {
+    const [r] = await this.rpc.call("add_followup_v2", { p_session: sessionId, p_question: question, p_mentors: mentorIds, p_photo_file_id: photoFileId });
+    if (!r) throw new RepositoryError("add_followup_v2 returned no row");
+    return Number(r.id ?? r.add_followup_v2);
+  }
+
+  async setFollowupNotified(id: number, mentorIds: number[]): Promise<void> {
+    await this.rpc.call("set_followup_notified", { p_id: id, p_mentors: mentorIds });
+  }
+
+  async listDashboardUsers(): Promise<DashboardUser[]> {
+    const rows = await this.rpc.call("dashboard_list_users", {});
+    return rows.map((r) => ({
+      id: Number(r.id), email: String(r.email), displayName: String(r.display_name), telegramId: Number(r.telegram_id),
+      addedByEmail: String(r.added_by_email), createdAt: date(r.created_at),
+    }));
+  }
+
+  async addDashboardUser(u: { email: string; displayName: string; telegramId: number; addedByEmail: string }): Promise<number | null> {
+    const [r] = await this.rpc.call("dashboard_add_user", { p_email: u.email, p_name: u.displayName, p_telegram_id: u.telegramId, p_added_by: u.addedByEmail });
+    return r ? Number(r.id ?? r.dashboard_add_user) : null;
+  }
+
+  async removeDashboardUser(id: number): Promise<string | null> {
+    const [r] = await this.rpc.call("dashboard_remove_user", { p_id: id });
+    const e = r ? (r.email ?? r.dashboard_remove_user) : null;
+    return e ? String(e) : null;
+  }
+
+  async issueLoginToken(email: string, tokenHash: string, ttlS: number, max: number, windowS: number): Promise<boolean> {
+    const [r] = await this.rpc.call("dashboard_issue_login_token", { p_email: email, p_token_hash: tokenHash, p_ttl_s: ttlS, p_max: max, p_window_s: windowS });
+    return Boolean(r?.issued ?? r?.dashboard_issue_login_token);
+  }
+
+  async consumeLoginToken(tokenHash: string): Promise<string | null> {
+    const [r] = await this.rpc.call("dashboard_consume_login_token", { p_token_hash: tokenHash });
+    const e = r ? (r.email ?? r.dashboard_consume_login_token) : null;
+    return e ? String(e) : null;
+  }
+
+  async createDashboardSession(sessionHash: string, csrfHash: string, email: string, ttlS: number): Promise<void> {
+    await this.rpc.call("dashboard_create_session", { p_session_hash: sessionHash, p_csrf_hash: csrfHash, p_email: email, p_ttl_s: ttlS });
+  }
+
+  async getDashboardSession(sessionHash: string): Promise<{ email: string; csrfHash: string } | null> {
+    const [r] = await this.rpc.call("dashboard_get_session", { p_session_hash: sessionHash });
+    return r ? { email: String(r.email), csrfHash: String(r.csrf_hash) } : null;
+  }
+
+  async revokeDashboardSession(sessionHash: string): Promise<void> {
+    await this.rpc.call("dashboard_revoke_session", { p_session_hash: sessionHash });
+  }
+
+  async listFollowups(tab: FollowupTab, claimTtlS: number): Promise<FollowupView[]> {
+    const rows = await this.rpc.call("dashboard_list_followups", { p_tab: tab, p_claim_ttl_s: claimTtlS });
+    const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
+    return rows.map((r) => ({
+      id: Number(r.id), question: String(r.question), hasPhoto: Boolean(r.has_photo), threadId: num(r.thread_id), viaDm: Boolean(r.via_dm),
+      createdAt: date(r.created_at), status: String(r.status) as FollowupStatus,
+      claimedByEmail: str(r.claimed_by_email), claimedByName: str(r.claimed_by_name),
+      replyText: str(r.reply_text), repliedByName: str(r.replied_by_name), repliedAt: r.replied_at ? date(r.replied_at) : null,
+      dmStatus: str(r.dm_status) as DmDelivery | null, topicStatus: str(r.topic_status) as TopicDelivery | null,
+      knowledgeSourceId: str(r.knowledge_source_id),
+    }));
+  }
+
+  async followupPhoto(id: number): Promise<string | null> {
+    const [r] = await this.rpc.call("dashboard_followup_photo", { p_id: id });
+    const f = r ? (r.photo_file_id ?? r.dashboard_followup_photo) : null;
+    return f ? String(f) : null;
+  }
+
+  async claimFollowup(id: number, email: string, name: string, claimTtlS: number): Promise<{ claimed: boolean; claimedByName: string | null }> {
+    const [r] = await this.rpc.call("dashboard_claim_followup", { p_id: id, p_email: email, p_name: name, p_claim_ttl_s: claimTtlS });
+    return { claimed: Boolean(r?.claimed), claimedByName: r?.claimed_by_name ? String(r.claimed_by_name) : null };
+  }
+
+  async releaseFollowup(id: number, email: string): Promise<boolean> {
+    const [r] = await this.rpc.call("dashboard_release_followup", { p_id: id, p_email: email });
+    return Boolean(r?.released ?? r?.dashboard_release_followup);
+  }
+
+  async closeFollowup(id: number, email: string, name: string, reply: string, claimTtlS: number): Promise<ClosedFollowup | null> {
+    const [r] = await this.rpc.call("dashboard_close_followup", { p_id: id, p_email: email, p_name: name, p_reply: reply, p_claim_ttl_s: claimTtlS });
+    if (!r) return null;
+    return {
+      sessionId: String(r.session_id), question: String(r.question), learnerId: Number(r.learner_id),
+      learnerName: r.learner_name ? String(r.learner_name) : null, learnerStarted: Boolean(r.learner_started),
+      originChatId: num(r.origin_chat_id), originThreadId: num(r.origin_thread_id), originMessageId: num(r.origin_message_id),
+    };
+  }
+
+  async setFollowupDelivery(id: number, dm: DmDelivery, topic: TopicDelivery): Promise<void> {
+    await this.rpc.call("dashboard_set_delivery", { p_id: id, p_dm: dm, p_topic: topic });
+  }
+
+  async followupForKnowledge(id: number): Promise<FollowupKnowledgeInfo | null> {
+    const [r] = await this.rpc.call("dashboard_followup_for_knowledge", { p_id: id });
+    if (!r) return null;
+    return { status: String(r.status), question: String(r.question), replyText: r.reply_text ? String(r.reply_text) : null, knowledgeSourceId: r.knowledge_source_id ? String(r.knowledge_source_id) : null };
+  }
+
+  async setFollowupKnowledge(id: number, sourceId: string): Promise<boolean> {
+    const [r] = await this.rpc.call("dashboard_set_knowledge", { p_id: id, p_source: sourceId });
+    return Boolean(r?.linked ?? r?.dashboard_set_knowledge);
   }
 }

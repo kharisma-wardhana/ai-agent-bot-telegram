@@ -2,7 +2,9 @@ import type { PGlite } from "@electric-sql/pglite";
 import { PGlite as PGliteCtor } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
 import { beforeEach, describe, expect, it } from "vitest";
+import { RpcRepository } from "../../src/db/repository";
 import { freshDb, migrationFiles, migrationSql } from "./helpers";
+import { PgliteRpc } from "./pglite-rpc";
 
 // Regression for docs/mentor-followup-dashboard/spec.md (AC 5, 8, 10, 11, 22), at the SQL level.
 
@@ -50,7 +52,7 @@ describe("only follow-ups created after the migration are listed (AC 8)", () => 
     const qs = (await list("active")).map((r) => r.question);
     expect(qs).toEqual(expect.arrayContaining(["pertanyaan baru", "pertanyaan baru lewat fungsi lama"]));
     expect(qs).not.toContain("pertanyaan lama");
-  });
+  }, 30_000); // builds a second PGlite instance with pgvector: slow under the parallel suite
 });
 
 describe("list never carries learner identity (AC 9, data side)", () => {
@@ -156,5 +158,56 @@ describe("knowledge link is set once, only on closed questions (AC 16, 17)", () 
     await db.query(`select * from dashboard_close_followup($1, 'a@x.id', 'Ana', 'jawab', $2)`, [id, DAY]);
     expect((await db.query<{ linked: boolean }>(`select * from dashboard_set_knowledge($1, $2)`, [id, src])).rows[0]!.linked).toBe(true);
     expect((await db.query<{ linked: boolean }>(`select * from dashboard_set_knowledge($1, $2)`, [id, src])).rows[0]!.linked).toBe(false);
+  });
+});
+
+describe("RpcRepository round-trips every dashboard method through PGlite (step 2)", () => {
+  it("covers users, links, sessions and the follow-up lifecycle", async () => {
+    const repo = new RpcRepository(new PgliteRpc(db));
+    const s = await learnerSession(501, "Ani");
+
+    const fid = await repo.addFollowupV2(s, "Apa itu embedding?", [], "photo-1");
+    await repo.setFollowupNotified(fid, [111, 333]);
+    expect((await db.query<{ mentors_notified: number[] }>(`select mentors_notified from mentor_followups where id = $1`, [fid])).rows[0]!.mentors_notified.map(Number)).toEqual([111, 333]);
+    expect(await repo.followupPhoto(fid)).toBe("photo-1");
+
+    const uid = await repo.addDashboardUser({ email: "Mentor@X.id", displayName: "Mentor", telegramId: 333, addedByEmail: "owner@x.id" });
+    expect(uid).toEqual(expect.any(Number));
+    expect(await repo.addDashboardUser({ email: "mentor@x.id", displayName: "Dup", telegramId: 1, addedByEmail: "o" })).toBeNull();
+    expect((await repo.listDashboardUsers()).map((u) => [u.email, u.telegramId])).toEqual([["mentor@x.id", 333]]);
+
+    expect(await repo.issueLoginToken("mentor@x.id", "th", 600, 3, 900)).toBe(true);
+    expect(await repo.consumeLoginToken("th")).toBe("mentor@x.id");
+    expect(await repo.consumeLoginToken("th")).toBeNull();
+    await repo.createDashboardSession("sh", "ch", "mentor@x.id", 3600);
+    expect(await repo.getDashboardSession("sh")).toEqual({ email: "mentor@x.id", csrfHash: "ch" });
+    await repo.revokeDashboardSession("sh");
+    expect(await repo.getDashboardSession("sh")).toBeNull();
+
+    const [view] = await repo.listFollowups("active", DAY);
+    expect(view).toMatchObject({ id: fid, question: "Apa itu embedding?", hasPhoto: true, threadId: 7, viaDm: false, status: "open" });
+    expect(await repo.claimFollowup(fid, "mentor@x.id", "Mentor", DAY)).toEqual({ claimed: true, claimedByName: "Mentor" });
+    expect(await repo.claimFollowup(fid, "b@x.id", "Budi", DAY)).toEqual({ claimed: false, claimedByName: "Mentor" });
+    expect(await repo.releaseFollowup(fid, "b@x.id")).toBe(false);
+    expect(await repo.releaseFollowup(fid, "mentor@x.id")).toBe(true);
+    await repo.claimFollowup(fid, "mentor@x.id", "Mentor", DAY);
+
+    const closed = await repo.closeFollowup(fid, "mentor@x.id", "Mentor", "Embedding itu vektor.", DAY);
+    expect(closed).toEqual({
+      sessionId: s, question: "Apa itu embedding?", learnerId: 501, learnerName: "Ani", learnerStarted: true,
+      originChatId: -1001234567890, originThreadId: 7, originMessageId: 42,
+    });
+    expect(await repo.closeFollowup(fid, "mentor@x.id", "Mentor", "lagi", DAY)).toBeNull();
+    await repo.setFollowupDelivery(fid, "sent", "failed");
+    const [done] = await repo.listFollowups("closed", DAY);
+    expect(done).toMatchObject({ status: "closed", replyText: "Embedding itu vektor.", repliedByName: "Mentor", dmStatus: "sent", topicStatus: "failed" });
+
+    expect(await repo.followupForKnowledge(fid)).toEqual({ status: "closed", question: "Apa itu embedding?", replyText: "Embedding itu vektor.", knowledgeSourceId: null });
+    const { sourceId } = await repo.insertKnowledge({ title: "F", sourceType: "text", origin: "add_knowledge", addedBy: 333, r2Key: null, contentHash: "fk" }, []);
+    expect(await repo.setFollowupKnowledge(fid, sourceId!)).toBe(true);
+    expect(await repo.setFollowupKnowledge(fid, sourceId!)).toBe(false);
+
+    expect(await repo.removeDashboardUser(uid!)).toBe("mentor@x.id");
+    expect(await repo.removeDashboardUser(uid!)).toBeNull();
   });
 });

@@ -24,3 +24,27 @@ describe("FakeRepository mirrors key SQL semantics", () => {
     expect(r.sessions.map((s) => s.learnerId)).toEqual([2]);
   });
 });
+
+describe("FakeRepository mirrors the 0004 dashboard semantics (step 2)", () => {
+  it("one claim wins, lapsed claims reopen, close happens once, knowledge links once, removal revokes sessions", async () => {
+    const r = new FakeRepository();
+    await r.upsertLearner({ telegramId: 7, displayName: "Ani", username: null, started: true });
+    const s = await r.openSession({ learnerId: 7, chatId: -100, threadId: 3, messageId: 9 });
+    const id = await r.addFollowupV2(s, "q", [1], null);
+    expect((await r.claimFollowup(id, "a", "A", 60)).claimed).toBe(true);
+    expect(await r.claimFollowup(id, "b", "B", 60)).toEqual({ claimed: false, claimedByName: "A" });
+    r.followups[0]!.claimedAt = new Date(Date.now() - 61_000);
+    expect((await r.listFollowups("active", 60))[0]!.status).toBe("open");
+    expect(await r.closeFollowup(id, "a", "A", "x", 60)).toBeNull();
+    expect((await r.claimFollowup(id, "b", "B", 60)).claimed).toBe(true);
+    expect(await r.closeFollowup(id, "b", "B", "jawab", 60)).toMatchObject({ learnerId: 7, learnerName: "Ani", originThreadId: 3 });
+    expect(await r.closeFollowup(id, "b", "B", "jawab", 60)).toBeNull();
+    expect(await r.setFollowupKnowledge(id, "src")).toBe(true);
+    expect(await r.setFollowupKnowledge(id, "src")).toBe(false);
+
+    const uid = await r.addDashboardUser({ email: "M@x", displayName: "M", telegramId: 5, addedByEmail: "o" });
+    await r.createDashboardSession("h", "c", "m@x", 60);
+    await r.removeDashboardUser(uid!);
+    expect(await r.getDashboardSession("h")).toBeNull();
+  });
+});
