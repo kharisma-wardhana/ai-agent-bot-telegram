@@ -24,3 +24,5 @@ Project-wide review checklist: [REVIEW.md](../REVIEW.md)
 - **cohort-welcome-message**: automatic batched welcome for new cohort members (dashboard-editable text); leave notices DMed to dashboard users
   - [intent.md](cohort-welcome-message/intent.md)
   - [spec.md](cohort-welcome-message/spec.md)
+  - [plan.md](cohort-welcome-message/plan.md)
+  - [tasks.md](cohort-welcome-message/tasks.md)
