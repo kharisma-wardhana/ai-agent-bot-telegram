@@ -15,3 +15,5 @@ Project-wide review checklist: [REVIEW.md](../REVIEW.md)
 - **mentor-followup-dashboard**: phone-friendly web dashboard where mentors claim and reply to follow-up questions; the bot relays replies to learners
   - [intent.md](mentor-followup-dashboard/intent.md)
   - [spec.md](mentor-followup-dashboard/spec.md)
+  - [plan.md](mentor-followup-dashboard/plan.md)
+  - [tasks.md](mentor-followup-dashboard/tasks.md)
