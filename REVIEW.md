@@ -1,6 +1,7 @@
 # REVIEW.md
 *Author: Kharisma Wardhana. Stage: Deploy. Written: 2026-11-02. Via /aspec:make-it-simple-v2.*
 *Amended: 2026-11-03 for mentor-followup-dashboard.*
+*Amended: 2026-11-03 for cohort-welcome-message.*
 
 What every merge request in this repo is reviewed against, by a human or by Claude. Specific to this codebase: a Cloudflare Worker Telegram bot (`worker/`), Supabase SQL (`db/migrations/`), Python ingestion (`ingest/`) and Kaggle services (`kaggle/`).
 
@@ -16,6 +17,9 @@ What every merge request in this repo is reviewed against, by a human or by Clau
 - **Dashboard reply closes before it sends.** `replyToFollowup` (`worker/src/dashboard/followups.ts`) calls `closeFollowup`, the claimer-only conditional update, before any Telegram send, so a double submit or race can't deliver twice. The learner DM goes through `learnerReplyText` (≤ 1000 chars), and an unstarted learner or a 403 goes to `holdAnswer(..., "not_started")`.
 - **One claim TTL.** The 24 h lapse is computed at read time in SQL (`dashboard_list_followups`, `dashboard_claim_followup`, `dashboard_close_followup`) and always passed in as `CLAIM_TTL_S`. Don't hard-code a second value anywhere.
 - **Fake ↔ SQL parity for 0004.** `FakeRepository`'s dashboard methods mirror the SQL semantics, as covered by `test/fake-repository.test.ts` and `test/db/dashboard.test.ts`. Change both together.
+- **Welcome batch is take-then-post.** `postPendingWelcomes` (`worker/src/welcome/welcome.ts`) takes waiting rows with the atomic `take_pending_welcomes`, and puts a batch back only when the send fails. Never read-then-delete in two steps, because overlapping cron runs would double-post.
+- **Mention offsets** come from `renderWelcome` in UTF-16 units (JS string indexing). Any change to the name joining or the placeholders keeps the offset test in `welcome.test.ts` passing.
+- **Member events don't go through the learner Durable Object.** `member_join`/`member_leave` are handled in the webhook and must stay quick: one DB write, or a few DMs.
 
 ### Security
 - **Secrets.** `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `SUPABASE_SERVICE_KEY`, `KAGGLE_SHARED_SECRET`, `MCP_TOKENS` and the Kaggle-only R2/Cloudflare/tunnel tokens appear only as names (wrangler secrets, Kaggle secrets, `.dev.vars.example`). Never as values in code, tests, logs or error messages. `TelegramError` and `RepositoryError` must not include URLs, because the Telegram URL contains the token.
@@ -31,6 +35,8 @@ What every merge request in this repo is reviewed against, by a human or by Clau
 - **Output escaping and CSP.** All dynamic HTML goes through `esc()` in `dashboard/views.ts`. The CSP forbids scripts, so adding JavaScript means changing the CSP, which needs a reviewer. Keep `Referrer-Policy: same-origin`, because `no-referrer` makes browsers send `Origin: null` and breaks every form.
 - **Image proxy** streams bytes through the Worker and never redirects to a Telegram file URL, because that URL contains the bot token.
 - **Mentions** use `entities` (`text_mention`), never `parse_mode`.
+- **The welcome template is admin-controlled public text.** It's sent with no `parse_mode` and rendered with `esc()` on the Sambutan page. A change that adds `parse_mode`, or renders it unescaped, is a blocker.
+- `/dashboard/sambutan` sits behind `requireSession` like every other dashboard route.
 
 ### Compliance
 - **Personal data (UU PDP).** No raw audio or image bytes are persisted (R2 holds only mentor-uploaded course files). New learner data goes into tables that cascade from `learners`, so `delete_learner_data` still removes it. Retention (cohort + 90 days) is unchanged unless the program owner signs off.
@@ -40,6 +46,8 @@ What every merge request in this repo is reviewed against, by a human or by Clau
 - **Photo follow-ups store a Telegram `file_id`** (`mentor_followups.photo_file_id`). This is a reference, not bytes, but the privacy notice should say so once the program owner signs off.
 - **Add-to-knowledge is person-triggered only.** Nothing may call `addFollowupToKnowledge` automatically.
 - **Staff data.** `dashboard_users` holds staff emails and Telegram IDs. The spec sets retention at removal + 90 days, but **no purge job exists yet** (accepted debt, tracked as a follow-up).
+- **Leave notices** DM a learner's name and username to dashboard users only. They're never posted in the group and never stored.
+- **`pending_welcomes`** holds newcomers' names only until posted, and purges rows older than 24 h. Don't add history tables for joins or leaves without program-owner sign-off.
 
 ## Severity levels
 | Level | Meaning | Action |
@@ -59,6 +67,7 @@ What every merge request in this repo is reviewed against, by a human or by Clau
 - `worker/e2e/server.ts` `/__test/*` routes are test-only. Review only that nothing under `worker/src/` imports from `worker/e2e/` or `worker/test/`.
 - Dashboard CSS/visual styling, beyond the 44 px tap targets and the no-horizontal-scroll rule.
 - Accepted debt: the publish age of `@playwright/test`, `@hono/node-server` and `tsx` was not verified from the build environment (see the `pr.md` checklist).
+- The wording of the default welcome text (product copy), unless it breaks the persona rules or the 1000-character cap.
 
 ## What a human must decide
 - Whether a change to `RETRIEVAL_THRESHOLD`, the prompt rules or the skill packs is worth its effect on the live eval numbers (AC 4, 6, 8, 21). Claude reports the numbers; a human chooses the trade-off.

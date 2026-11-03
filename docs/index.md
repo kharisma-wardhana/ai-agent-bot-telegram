@@ -27,3 +27,5 @@ Project-wide review checklist: [REVIEW.md](../REVIEW.md)
   - [plan.md](cohort-welcome-message/plan.md)
   - [tasks.md](cohort-welcome-message/tasks.md)
   - [setup.md](cohort-welcome-message/setup.md): migration 0005, admin rights + webhook re-registration with chat_member, Sambutan page, rollback
+  - [ops-tools.md](cohort-welcome-message/ops-tools.md): additions to the documented (not wired) ops tools
+  - [pr.md](cohort-welcome-message/pr.md): pull request description, ready to paste
