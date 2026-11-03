@@ -32,7 +32,7 @@ beforeEach(async () => {
 
 describe("0004 applies on top of 0001–0003 (AC 22)", () => {
   it("is a new, last migration file and keeps add_followup from 0003", async () => {
-    expect(migrationFiles().at(-1)).toBe("0004_mentor_dashboard.sql");
+    expect(migrationFiles()).toContain("0004_mentor_dashboard.sql");
     const r = await db.query<{ proname: string }>(`select proname from pg_proc where proname in ('add_followup', 'add_followup_v2') order by 1`);
     expect(r.rows.map((x) => x.proname)).toEqual(["add_followup", "add_followup_v2"]);
   });

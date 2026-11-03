@@ -36,8 +36,8 @@ describe("migrations", () => {
     expect(r.rows.map((x) => x.table_name)).toEqual([
       "dashboard_login_tokens", "dashboard_sessions", "dashboard_users", // 0004 (mentor-followup-dashboard)
       "feedback", "inference_heartbeat", "ingest_jobs", "knowledge_chunks", "knowledge_sources",
-      "learners", "memory_edges", "memory_nodes", "mentor_followups", "pending_answers",
-      "session_turns", "sessions",
+      "learners", "memory_edges", "memory_nodes", "mentor_followups", "pending_answers", "pending_welcomes",
+      "session_turns", "sessions", "welcome_settings", // pending_welcomes + welcome_settings: 0005 (cohort-welcome-message)
     ]);
   });
 });

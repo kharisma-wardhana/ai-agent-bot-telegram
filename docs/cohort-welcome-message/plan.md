@@ -24,6 +24,8 @@ Requirements are not restated here. Each step links to [spec.md › Acceptance c
 - `worker/test/fakes/fake-repository.ts` (edit): fake welcome methods mirroring `0005`.
 - `worker/test/fakes/fake-telegram.ts` (edit): a `chatMember(...)` update fixture builder.
 - `worker/test/db/welcome.test.ts` (new): migration and SQL regression.
+- `worker/test/db/schema.test.ts` (edit): the table list gains `pending_welcomes` and `welcome_settings`.
+- `worker/test/db/dashboard.test.ts` (edit): feature 2's "0004 is the newest migration" assertion becomes "0004 is present". It could only ever hold until the next migration existed. *(amended during build, step 1)*
 - `worker/test/welcome.test.ts` (new): integration at the webhook and at `runScheduled`.
 - `worker/test/dashboard-welcome.test.ts` (new): settings page authN/authZ, validation, escaping and markup.
 - `worker/test/telegram.test.ts` (edit): `classify` cases for `chat_member`, and a regression case for service messages.
