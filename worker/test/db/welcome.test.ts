@@ -1,6 +1,8 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { beforeEach, describe, expect, it } from "vitest";
+import { RpcRepository } from "../../src/db/repository";
 import { freshDb, migrationFiles } from "./helpers";
+import { PgliteRpc } from "./pglite-rpc";
 
 // Regression for docs/cohort-welcome-message/spec.md AC 13, at the SQL level.
 
@@ -45,6 +47,25 @@ describe("waiting list", () => {
     await db.query(`update pending_welcomes set joined_at = now() - interval '25 hours' where telegram_id = 7`);
     await db.query(`select * from queue_welcome(8, 'Baru')`);
     expect((await take()).map((r) => Number(r.telegram_id))).toEqual([8]);
+  });
+});
+
+describe("RpcRepository round-trips every welcome method through PGlite (step 2)", () => {
+  it("settings, queue, unqueue and take", async () => {
+    const repo = new RpcRepository(new PgliteRpc(db));
+    expect(await repo.getWelcomeSettings()).toBeNull();
+    await repo.saveWelcomeSettings({ template: "Halo {nama}", topicId: 9, welcomeEnabled: true, leaveEnabled: false, updatedBy: "a@x.id" });
+    expect(await repo.getWelcomeSettings()).toMatchObject({ template: "Halo {nama}", topicId: 9, welcomeEnabled: true, leaveEnabled: false, updatedBy: "a@x.id" });
+
+    await repo.queueWelcome(1, "Ani");
+    await repo.queueWelcome(2, "Budi");
+    await repo.queueWelcome(3, "Citra");
+    expect(await repo.unqueueWelcome(2)).toBe(true);
+    expect(await repo.unqueueWelcome(2)).toBe(false);
+    const taken = await repo.takePendingWelcomes(50);
+    expect(taken.map((t) => [t.telegramId, t.displayName])).toEqual([[1, "Ani"], [3, "Citra"]]);
+    expect(taken[0]!.joinedAt).toBeInstanceOf(Date);
+    expect(await repo.takePendingWelcomes(50)).toEqual([]);
   });
 });
 

@@ -112,6 +112,10 @@ export interface ClosedFollowup {
 export interface DashboardUser { id: number; email: string; displayName: string; telegramId: number; addedByEmail: string; createdAt: Date }
 export interface FollowupKnowledgeInfo { status: string; question: string; replyText: string | null; knowledgeSourceId: string | null }
 
+// ---------- Cohort welcome (docs/cohort-welcome-message) ----------
+export interface WelcomeSettings { template: string; topicId: number | null; welcomeEnabled: boolean; leaveEnabled: boolean; updatedBy: string | null; updatedAt: Date | null }
+export interface PendingWelcome { telegramId: number; displayName: string; joinedAt: Date }
+
 /** Interface the rest of the Worker depends on (fakes implement it in tests). */
 export interface Repository {
   matchChunks(embedding: number[], topK: number, minSimilarity: number): Promise<ChunkMatch[]>;
@@ -154,6 +158,12 @@ export interface Repository {
   setFollowupDelivery(id: number, dm: DmDelivery, topic: TopicDelivery): Promise<void>;
   followupForKnowledge(id: number): Promise<FollowupKnowledgeInfo | null>;
   setFollowupKnowledge(id: number, sourceId: string): Promise<boolean>;
+  // Cohort welcome
+  getWelcomeSettings(): Promise<WelcomeSettings | null>;
+  saveWelcomeSettings(s: { template: string; topicId: number | null; welcomeEnabled: boolean; leaveEnabled: boolean; updatedBy: string }): Promise<void>;
+  queueWelcome(telegramId: number, displayName: string): Promise<void>;
+  unqueueWelcome(telegramId: number): Promise<boolean>;
+  takePendingWelcomes(limit: number): Promise<PendingWelcome[]>;
 }
 
 const vec = (v: number[]) => `[${v.join(",")}]`;
@@ -390,5 +400,35 @@ export class RpcRepository implements Repository {
   async setFollowupKnowledge(id: number, sourceId: string): Promise<boolean> {
     const [r] = await this.rpc.call("dashboard_set_knowledge", { p_id: id, p_source: sourceId });
     return Boolean(r?.linked ?? r?.dashboard_set_knowledge);
+  }
+
+  // ---------- Cohort welcome ----------
+  async getWelcomeSettings(): Promise<WelcomeSettings | null> {
+    const [r] = await this.rpc.call("get_welcome_settings", {});
+    if (!r) return null;
+    return {
+      template: String(r.template), topicId: num(r.topic_id), welcomeEnabled: Boolean(r.welcome_enabled), leaveEnabled: Boolean(r.leave_enabled),
+      updatedBy: r.updated_by ? String(r.updated_by) : null, updatedAt: r.updated_at ? date(r.updated_at) : null,
+    };
+  }
+
+  async saveWelcomeSettings(s: { template: string; topicId: number | null; welcomeEnabled: boolean; leaveEnabled: boolean; updatedBy: string }): Promise<void> {
+    await this.rpc.call("save_welcome_settings", { p_template: s.template, p_topic_id: s.topicId, p_welcome: s.welcomeEnabled, p_leave: s.leaveEnabled, p_by: s.updatedBy });
+  }
+
+  async queueWelcome(telegramId: number, displayName: string): Promise<void> {
+    await this.rpc.call("queue_welcome", { p_user: telegramId, p_name: displayName });
+  }
+
+  async unqueueWelcome(telegramId: number): Promise<boolean> {
+    const [r] = await this.rpc.call("unqueue_welcome", { p_user: telegramId });
+    return Boolean(r?.removed ?? r?.unqueue_welcome);
+  }
+
+  async takePendingWelcomes(limit: number): Promise<PendingWelcome[]> {
+    const rows = await this.rpc.call("take_pending_welcomes", { p_limit: limit });
+    return rows
+      .map((r) => ({ telegramId: Number(r.telegram_id), displayName: String(r.display_name), joinedAt: date(r.joined_at) }))
+      .sort((a, b) => a.joinedAt.getTime() - b.joinedAt.getTime() || a.telegramId - b.telegramId);
   }
 }

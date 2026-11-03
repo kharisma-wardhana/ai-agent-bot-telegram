@@ -2,6 +2,7 @@ import type {
   Backend, ChunkMatch, KnowledgeChunkInput, KnowledgeSourceInput, Learner, MemoryEdge, MemoryEdgeInput, MemoryMatch,
   MemoryNodeInput, MemorySession, OpenSession, PendingAnswer, PendingReason, Repository, Turn, TurnInput,
   ClosedFollowup, DashboardUser, DmDelivery, FollowupKnowledgeInfo, FollowupTab, FollowupView, TopicDelivery,
+  PendingWelcome, WelcomeSettings,
 } from "../../src/db/repository";
 
 const cos = (a: number[], b: number[]) => {
@@ -327,5 +328,40 @@ export class FakeRepository implements Repository {
     if (!f) return false;
     f.knowledgeSourceId = sourceId;
     return true;
+  }
+
+  // ---------- Cohort welcome (mirrors db/migrations/0005) ----------
+  welcomeSettings: WelcomeSettings | null = null;
+  pendingWelcomes: PendingWelcome[] = [];
+
+  async getWelcomeSettings() {
+    return this.welcomeSettings ? { ...this.welcomeSettings } : null;
+  }
+
+  async saveWelcomeSettings(s: { template: string; topicId: number | null; welcomeEnabled: boolean; leaveEnabled: boolean; updatedBy: string }) {
+    if (s.template.length > 1000 || !s.template.includes("{nama}")) throw new Error("welcome_settings check violated");
+    this.welcomeSettings = { ...s, updatedAt: new Date() };
+  }
+
+  async queueWelcome(telegramId: number, displayName: string) {
+    const cutoff = Date.now() - 24 * 3600_000;
+    this.pendingWelcomes = this.pendingWelcomes.filter((p) => p.joinedAt.getTime() >= cutoff);
+    const cur = this.pendingWelcomes.find((p) => p.telegramId === telegramId);
+    if (cur) cur.displayName = displayName;
+    else this.pendingWelcomes.push({ telegramId, displayName, joinedAt: new Date() });
+  }
+
+  async unqueueWelcome(telegramId: number) {
+    const before = this.pendingWelcomes.length;
+    this.pendingWelcomes = this.pendingWelcomes.filter((p) => p.telegramId !== telegramId);
+    return this.pendingWelcomes.length < before;
+  }
+
+  async takePendingWelcomes(limit: number) {
+    const sorted = [...this.pendingWelcomes].sort((a, b) => a.joinedAt.getTime() - b.joinedAt.getTime() || a.telegramId - b.telegramId);
+    const taken = sorted.slice(0, limit);
+    const ids = new Set(taken.map((t) => t.telegramId));
+    this.pendingWelcomes = this.pendingWelcomes.filter((p) => !ids.has(p.telegramId));
+    return taken.map((t) => ({ ...t }));
   }
 }

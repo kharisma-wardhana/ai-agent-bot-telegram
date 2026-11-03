@@ -48,3 +48,18 @@ describe("FakeRepository mirrors the 0004 dashboard semantics (step 2)", () => {
     expect(await r.getDashboardSession("h")).toBeNull();
   });
 });
+
+describe("FakeRepository mirrors the 0005 welcome semantics (step 2)", () => {
+  it("queues idempotently, unqueues, takes each row once oldest first, and enforces the template checks", async () => {
+    const r = new FakeRepository();
+    await r.queueWelcome(1, "Ani");
+    await r.queueWelcome(1, "Ani B");
+    await r.queueWelcome(2, "Budi");
+    r.pendingWelcomes.find((p) => p.telegramId === 2)!.joinedAt = new Date(Date.now() - 60_000);
+    expect((await r.takePendingWelcomes(1)).map((p) => p.telegramId)).toEqual([2]);
+    expect(await r.unqueueWelcome(1)).toBe(true);
+    expect(await r.takePendingWelcomes(5)).toEqual([]);
+    await expect(r.saveWelcomeSettings({ template: "tanpa placeholder", topicId: null, welcomeEnabled: true, leaveEnabled: true, updatedBy: "a" })).rejects.toThrow();
+    expect(await r.getWelcomeSettings()).toBeNull();
+  });
+});
