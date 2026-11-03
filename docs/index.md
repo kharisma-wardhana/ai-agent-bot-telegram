@@ -18,3 +18,5 @@ Project-wide review checklist: [REVIEW.md](../REVIEW.md)
   - [plan.md](mentor-followup-dashboard/plan.md)
   - [tasks.md](mentor-followup-dashboard/tasks.md)
   - [setup.md](mentor-followup-dashboard/setup.md): migration 0004, the two new Worker vars, first login, daily use, rollback
+  - [ops-tools.md](mentor-followup-dashboard/ops-tools.md): dashboard additions to deploy/status/rollback (documented, not wired)
+  - [pr.md](mentor-followup-dashboard/pr.md): pull request description, ready to paste
