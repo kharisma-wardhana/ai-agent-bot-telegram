@@ -1,4 +1,4 @@
-import type { TgEntity, TgMessage, TgUpdate, TgUser } from "./types";
+import type { TgChatMember, TgEntity, TgMessage, TgUpdate, TgUser } from "./types";
 
 export type Media = { type: "photo"; fileId: string } | { type: "voice"; fileId: string; mime: string };
 
@@ -10,7 +10,15 @@ export type BotEvent =
   | { kind: "hapusdata"; from: TgUser }
   | { kind: "feedback"; from: TgUser; via: "button"; value: "up" | "down"; callbackId: string; messageId: number | null }
   | { kind: "feedback"; from: TgUser; via: "reaction"; value: string; messageId: number }
-  | { kind: "dm_text"; from: TgUser; text: string; replyToMessageId: number | null; media: Media | null; messageId: number };
+  | { kind: "dm_text"; from: TgUser; text: string; replyToMessageId: number | null; media: Media | null; messageId: number }
+  // cohort-welcome-message: `from` is the member whose status changed (not the admin who changed it)
+  | { kind: "member_join"; from: TgUser }
+  | { kind: "member_leave"; from: TgUser; kicked: boolean };
+
+/** In the group: creator/admin/member, or restricted but still a member. */
+function inGroup(m: TgChatMember): boolean {
+  return m.status === "creator" || m.status === "administrator" || m.status === "member" || (m.status === "restricted" && m.is_member !== false);
+}
 
 export const ASK_HASHTAG = "#askai";
 export const FEEDBACK_EMOJI = new Set(["✅", "👍", "👎", "✔️", "☑️"]);
@@ -46,6 +54,18 @@ function command(text: string, botUsername: string): { cmd: string; args: string
 
 /** Classifies an incoming update. Pure: no I/O. */
 export function classify(update: TgUpdate, cfg: { groupChatId: number; botUsername: string }): BotEvent {
+  if (update.chat_member) {
+    const u = update.chat_member;
+    if (u.chat.id !== cfg.groupChatId) return { kind: "ignore", reason: "member change in other chat" };
+    const user = u.new_chat_member.user;
+    if (user.is_bot) return { kind: "ignore", reason: "bot member change" };
+    const was = inGroup(u.old_chat_member);
+    const now = inGroup(u.new_chat_member);
+    if (!was && now) return { kind: "member_join", from: user };
+    if (was && !now) return { kind: "member_leave", from: user, kicked: u.new_chat_member.status === "kicked" };
+    return { kind: "ignore", reason: "member status change" };
+  }
+
   if (update.callback_query) {
     const q = update.callback_query;
     if (q.from.is_bot) return { kind: "ignore", reason: "bot" };

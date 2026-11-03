@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TelegramClient, TelegramError } from "../src/telegram/client";
 import { classify } from "../src/telegram/parse-update";
 import { ProgressMessage, STAGES } from "../src/telegram/progress";
-import { BOT, callback, dm, FakeTelegram, GROUP_ID, groupAsk, learner, reaction } from "./fakes/fake-telegram";
+import { BOT, callback, chatMember, dm, FakeTelegram, GROUP_ID, groupAsk, learner, reaction } from "./fakes/fake-telegram";
 
 const cfg = { groupChatId: GROUP_ID, botUsername: BOT };
 
@@ -80,5 +80,33 @@ describe("ProgressMessage (AC 3)", () => {
     expect(Math.max(...streamEdits.map((s) => s.split("\n\n")[1]!.length))).toBeLessThanOrEqual(50);
     expect(texts.at(-1)).toBe("Jawaban final");
     expect(p.timings.searching).toBe(0);
+  });
+});
+
+describe("classify chat_member updates (cohort-welcome-message AC 1, 2, 14)", () => {
+  const ani = learner(501, "Ani");
+  it("turns joins and leaves in the cohort group into member events", () => {
+    expect(classify(chatMember(ani, "left", "member"), cfg)).toEqual({ kind: "member_join", from: ani });
+    expect(classify(chatMember(ani, "kicked", "member"), cfg)).toEqual({ kind: "member_join", from: ani });
+    expect(classify(chatMember(ani, "left", "restricted", { isMember: true }), cfg)).toEqual({ kind: "member_join", from: ani });
+    expect(classify(chatMember(ani, "member", "left"), cfg)).toEqual({ kind: "member_leave", from: ani, kicked: false });
+    expect(classify(chatMember(ani, "member", "kicked"), cfg)).toEqual({ kind: "member_leave", from: ani, kicked: true });
+    expect(classify(chatMember(ani, "restricted", "restricted", { isMember: false }), cfg)).toMatchObject({ kind: "member_leave" });
+  });
+
+  it("ignores bots, other chats and status changes that are neither join nor leave", () => {
+    const bot = { ...learner(900, "Bot"), is_bot: true };
+    expect(classify(chatMember(bot, "left", "member"), cfg)).toMatchObject({ kind: "ignore" });
+    expect(classify(chatMember(ani, "left", "member", { chatId: -999 }), cfg)).toMatchObject({ kind: "ignore" });
+    expect(classify(chatMember(ani, "member", "administrator"), cfg)).toMatchObject({ kind: "ignore" });
+  });
+
+  it("still ignores join/leave service messages without #askAI (feature 1 AC 1 regression)", () => {
+    const joinMsg = groupAsk("", { from: ani });
+    joinMsg.message = { ...joinMsg.message!, text: undefined, new_chat_members: [ani] } as never;
+    const leaveMsg = groupAsk("", { from: ani });
+    leaveMsg.message = { ...leaveMsg.message!, text: undefined, left_chat_member: ani } as never;
+    expect(classify(joinMsg, cfg)).toMatchObject({ kind: "ignore", reason: "no #askAI" });
+    expect(classify(leaveMsg, cfg)).toMatchObject({ kind: "ignore", reason: "no #askAI" });
   });
 });

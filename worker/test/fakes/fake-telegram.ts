@@ -105,6 +105,19 @@ export function callback(data: string, from = learner(), messageId = 1000): TgUp
   return { update_id: uid++, callback_query: { id: `cb${uid}`, from, data, message: { message_id: messageId, chat: { id: from.id, type: "private" } } } };
 }
 
+/** A chat_member update: `user`'s status goes from `oldStatus` to `newStatus` in `chatId` (default: the cohort group). */
+export function chatMember(user: ReturnType<typeof learner>, oldStatus: string, newStatus: string, o: { chatId?: number; isMember?: boolean } = {}): TgUpdate {
+  const chat = { id: o.chatId ?? GROUP_ID, type: "supergroup" as const };
+  return {
+    update_id: uid++,
+    chat_member: {
+      chat, from: user, date: Math.floor(Date.now() / 1000),
+      old_chat_member: { status: oldStatus as never, user },
+      new_chat_member: { status: newStatus as never, user, ...(o.isMember === undefined ? {} : { is_member: o.isMember }) },
+    },
+  };
+}
+
 export function reaction(emoji: string, from = learner(), messageId = 1000): TgUpdate {
   return { update_id: uid++, message_reaction: { chat: { id: from.id, type: "private" }, message_id: messageId, user: from, new_reaction: [{ type: "emoji", emoji }] } };
 }

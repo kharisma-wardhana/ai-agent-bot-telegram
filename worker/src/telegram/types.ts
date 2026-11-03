@@ -28,11 +28,17 @@ export interface TgCallbackQuery { id: string; from: TgUser; data?: string; mess
 export type TgReaction = { type: "emoji"; emoji: string } | { type: "custom_emoji" | "paid"; custom_emoji_id?: string };
 export interface TgMessageReaction { chat: TgChat; message_id: number; user?: TgUser; new_reaction: TgReaction[] }
 
+export type TgMemberStatus = "creator" | "administrator" | "member" | "restricted" | "left" | "kicked";
+export interface TgChatMember { status: TgMemberStatus; user: TgUser; is_member?: boolean }
+/** A member's status changed (requires the bot to be admin and "chat_member" in allowed_updates). */
+export interface TgChatMemberUpdated { chat: TgChat; from: TgUser; date: number; old_chat_member: TgChatMember; new_chat_member: TgChatMember }
+
 export interface TgUpdate {
   update_id: number;
   message?: TgMessage;
   callback_query?: TgCallbackQuery;
   message_reaction?: TgMessageReaction;
+  chat_member?: TgChatMemberUpdated;
 }
 
 export interface InlineKeyboard { inline_keyboard: { text: string; callback_data: string }[][] }
