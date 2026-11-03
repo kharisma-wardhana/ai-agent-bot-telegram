@@ -76,6 +76,28 @@ test("mentors: add a mentor, the new mentor can sign in, then remove them", asyn
   await other.close();
 });
 
+test("layout: no horizontal scrolling at 360 px on the login, list and mentor pages (AC 21)", async ({ page, request }) => {
+  const longWord = "x".repeat(300);
+  await request.post(`/__test/followup?q=${encodeURIComponent(`Pertanyaan panjang ${longWord}`)}&photo=P1`);
+  const noHScroll = async (label: string) => {
+    // A string expression: this tsconfig has no DOM lib (it clashes with the Workers types the server code needs).
+    const [sw, iw] = await page.evaluate<[number, number]>("[document.documentElement.scrollWidth, window.innerWidth]");
+    expect(sw, `${label}: scrollWidth ${sw} > innerWidth ${iw}`).toBeLessThanOrEqual(iw);
+  };
+  await page.goto("/dashboard/login");
+  await noHScroll("login");
+  await login(page, request);
+  await noHScroll("list");
+  await page.getByRole("button", { name: "Klaim" }).click();
+  await noHScroll("list with reply form");
+  await page.goto("/dashboard/mentor");
+  await page.getByLabel("Nama").fill("Mentor Dengan Nama Yang Cukup Panjang Sekali");
+  await page.getByLabel("Email").fill(`seseorang.dengan.alamat.email.panjang.${"a".repeat(40)}@contoh-domain-panjang.co.id`);
+  await page.getByLabel("Telegram ID").fill("333");
+  await page.getByRole("button", { name: "Tambah" }).click();
+  await noHScroll("mentor");
+});
+
 test("reply: claim → type a reply → Kirim delivers it and the question shows under Selesai", async ({ page, request }) => {
   const { id } = await (await request.post("/__test/followup?q=Apa%20itu%20RAG%3F&learner=501&name=Ani")).json();
   await login(page, request);
