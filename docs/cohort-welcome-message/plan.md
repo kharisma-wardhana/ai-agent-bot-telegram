@@ -31,6 +31,7 @@ Requirements are not restated here. Each step links to [spec.md › Acceptance c
 - `worker/test/telegram.test.ts` (edit): `classify` cases for `chat_member`, and a regression case for service messages.
 - `worker/test/fake-repository.test.ts` (edit): a parity case for the welcome methods.
 - `worker/e2e/dashboard.spec.ts` (edit): a Sambutan flow at 360 px.
+- `worker/test/dashboard-markup.test.ts` (edit): feature 2's tap-target check listed the nav hrefs one by one. It now accepts any anchor inside `<nav>`, which the new "Sambutan" link needs. *(amended during build, step 6)*
 
 `worker/wrangler.toml` is **not** edited. No new vars, bindings or Durable Objects are needed.
 

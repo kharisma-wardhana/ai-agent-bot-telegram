@@ -98,6 +98,26 @@ test("layout: no horizontal scrolling at 360 px on the login, list and mentor pa
   await noHScroll("mentor");
 });
 
+test("sambutan: edit the welcome text, switch leave notices off, save, no horizontal scroll at 360 px", async ({ page, request }) => {
+  await login(page, request);
+  await page.getByRole("link", { name: "Sambutan" }).click();
+  await expect(page.getByText("Masih memakai teks bawaan.")).toBeVisible();
+  await page.getByLabel("Teks sambutan").fill("Halo {nama}! Selamat bergabung, jangan lupa Start di {bot} ya.");
+  await page.getByLabel("ID topik sambutan").fill("12");
+  await page.getByLabel("Kabari saat ada yang keluar").uncheck();
+  await page.getByRole("button", { name: "Simpan" }).click();
+  await expect(page.getByRole("status")).toContainText("Pengaturan sambutan disimpan");
+  await expect(page.getByLabel("Teks sambutan")).toHaveValue("Halo {nama}! Selamat bergabung, jangan lupa Start di {bot} ya.");
+  await expect(page.getByLabel("Kabari saat ada yang keluar")).not.toBeChecked();
+  await expect(page.getByLabel("Sambut anggota baru")).toBeChecked();
+  const [sw, iw] = await page.evaluate<[number, number]>("[document.documentElement.scrollWidth, window.innerWidth]");
+  expect(sw).toBeLessThanOrEqual(iw);
+
+  await page.getByLabel("Teks sambutan").fill("Tanpa placeholder");
+  await page.getByRole("button", { name: "Simpan" }).click();
+  await expect(page.getByRole("alert")).toContainText("wajib memuat {nama}");
+});
+
 test("reply: claim → type a reply → Kirim delivers it and the question shows under Selesai", async ({ page, request }) => {
   const { id } = await (await request.post("/__test/followup?q=Apa%20itu%20RAG%3F&learner=501&name=Ani")).json();
   await login(page, request);

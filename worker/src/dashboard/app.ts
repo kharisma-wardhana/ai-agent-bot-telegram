@@ -11,7 +11,8 @@ import {
   addFollowupToKnowledge, claimFollowup, followupImage, knowledgeEntry, listFollowups, releaseFollowup, replyToFollowup,
 } from "./followups";
 import { addUser, listUsers, removeUser } from "./users";
-import { authConfirmPage, authFailedPage, knowledgeConfirmPage, listPage, loginPage, mentorPage } from "./views";
+import { DEFAULT_SETTINGS, TEMPLATE_MAX } from "../welcome/welcome";
+import { authConfirmPage, authFailedPage, knowledgeConfirmPage, listPage, loginPage, mentorPage, welcomePage } from "./views";
 
 export function dashboardApp(): Hono<DashEnv> {
   const app = new Hono<DashEnv>();
@@ -100,6 +101,27 @@ export function dashboardApp(): Hono<DashEnv> {
     const r = await addFollowupToKnowledge(c.var.deps, c.var.user, id);
     const pesan = { added: "pengetahuan-ditambah", exists: "pengetahuan-sudah-ada", "not-closed": "belum-selesai", "not-found": "tidak-ditemukan" }[r];
     return c.redirect(back(pesan, id, r === "not-closed" ? "" : "selesai"), 303);
+  });
+
+  // ---------- Welcome settings (cohort-welcome-message AC 9–12) ----------
+  app.get("/sambutan", async (c) => {
+    const saved = await c.var.deps.repo.getWelcomeSettings();
+    return c.html(welcomePage({ user: c.var.user, csrf: c.var.csrf, settings: saved ?? DEFAULT_SETTINGS, isDefault: !saved, flash: c.req.query("pesan") }));
+  });
+
+  app.post("/sambutan", async (c) => {
+    const b = await c.req.parseBody();
+    const template = (typeof b.template === "string" ? b.template : "").replace(/\r\n/g, "\n");
+    const topicRaw = (typeof b.topic_id === "string" ? b.topic_id : "").trim();
+    const fail = (pesan: string) => c.redirect(`/dashboard/sambutan?pesan=${pesan}`, 303);
+    if (template.length > TEMPLATE_MAX) return fail("terlalu-panjang");
+    if (!template.includes("{nama}")) return fail("tanpa-nama");
+    if (topicRaw !== "" && !/^[1-9][0-9]{0,14}$/.test(topicRaw)) return fail("topik-tidak-valid");
+    await c.var.deps.repo.saveWelcomeSettings({
+      template, topicId: topicRaw === "" ? null : Number(topicRaw),
+      welcomeEnabled: b.welcome_enabled === "on", leaveEnabled: b.leave_enabled === "on", updatedBy: c.var.user.email,
+    });
+    return c.redirect("/dashboard/sambutan?pesan=tersimpan", 303);
   });
 
   // ---------- Mentor management (AC 7, 18) ----------

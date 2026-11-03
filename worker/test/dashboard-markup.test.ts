@@ -59,7 +59,7 @@ describe("every dashboard page is phone-first and labelled (AC 21)", () => {
       }
       for (const img of p.match(/<img\b[^>]*>/g) ?? []) expect(img).toMatch(/\balt="[^"]+"/);
       for (const a of p.match(/<a\b[^>]*>/g) ?? []) {
-        const inNav = /href="\/dashboard(\?tab=selesai|\/mentor)?"/.test(a) && /<nav[\s\S]*<\/nav>/.exec(p)![0].includes(a);
+        const inNav = /<nav[\s\S]*<\/nav>/.exec(p)?.[0].includes(a) ?? false; // nav links get the 44 px rule via `nav a`
         expect(inNav || /class="link"/.test(a), `${name}: tap-target class on ${a}`).toBe(true);
       }
     });

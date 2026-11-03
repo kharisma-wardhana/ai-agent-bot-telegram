@@ -2,7 +2,7 @@
  * Server-rendered dashboard HTML. Every dynamic value goes through esc() (spec AC 20).
  * No JavaScript: the CSP forbids scripts. Mobile-first, Bahasa Indonesia (spec › Behaviour, AC 21).
  */
-import type { FollowupView } from "../db/repository";
+import type { FollowupView, WelcomeSettings } from "../db/repository";
 import type { DashUser } from "./auth";
 
 export function esc(v: unknown): string {
@@ -48,9 +48,11 @@ img.photo{display:block;max-width:100%;height:auto;border-radius:8px;margin:0 0 
 form.inline{display:inline}
 .empty{color:var(--muted);text-align:center;padding:24px 0}
 :focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.check{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:600;margin:0 0 4px}
+.check input{width:22px;height:22px;margin:0;flex:none}
 `;
 
-export interface PageOpts { user?: DashUser; csrf?: string; current?: "aktif" | "selesai" | "mentor" }
+export interface PageOpts { user?: DashUser; csrf?: string; current?: "aktif" | "selesai" | "mentor" | "sambutan" }
 
 export function page(title: string, body: string, o: PageOpts = {}): string {
   const nav = o.user
@@ -58,6 +60,7 @@ export function page(title: string, body: string, o: PageOpts = {}): string {
         <a href="/dashboard"${o.current === "aktif" ? ' aria-current="page"' : ""}>Aktif</a>
         <a href="/dashboard?tab=selesai"${o.current === "selesai" ? ' aria-current="page"' : ""}>Selesai</a>
         <a href="/dashboard/mentor"${o.current === "mentor" ? ' aria-current="page"' : ""}>Mentor</a>
+        <a href="/dashboard/sambutan"${o.current === "sambutan" ? ' aria-current="page"' : ""}>Sambutan</a>
       </nav>`
     : "";
   const logout = o.user && o.csrf
@@ -250,4 +253,44 @@ export function listPage(o: { user: DashUser; csrf: string; tab: "aktif" | "sele
     ? o.items.map((i) => itemCard(i, o.user, o.csrf)).join("\n")
     : `<p class="empty">${o.tab === "selesai" ? "Belum ada pertanyaan yang selesai." : "Tidak ada pertanyaan yang menunggu. 🎉"}</p>`;
   return page(title, `<h2>${esc(title)}</h2>\n${flash}\n${body}`, { user: o.user, csrf: o.csrf, current: o.tab });
+}
+
+// ---------- Welcome settings (cohort-welcome-message) ----------
+export const WELCOME_FLASH: Record<string, { text: string; bad?: boolean }> = {
+  tersimpan: { text: "Pengaturan sambutan disimpan. Sambutan berikutnya memakai teks ini." },
+  "terlalu-panjang": { text: "Teks sambutan maksimal 1000 karakter. Tidak ada yang disimpan.", bad: true },
+  "tanpa-nama": { text: "Teks sambutan wajib memuat {nama}. Tidak ada yang disimpan.", bad: true },
+  "topik-tidak-valid": { text: "ID topik harus berupa angka, atau kosongkan untuk topik General. Tidak ada yang disimpan.", bad: true },
+};
+
+export function welcomePage(o: { user: DashUser; csrf: string; settings: WelcomeSettings; isDefault: boolean; flash?: string }): string {
+  const f = o.flash ? WELCOME_FLASH[o.flash] : undefined;
+  const flash = f ? `<p class="card flash${f.bad ? " bad" : ""}" role="${f.bad ? "alert" : "status"}">${esc(f.text)}</p>` : "";
+  const s = o.settings;
+  const saved = o.isDefault
+    ? "Masih memakai teks bawaan."
+    : `Terakhir disimpan oleh ${esc(s.updatedBy ?? "—")} · ${esc(fmtTime(s.updatedAt))}`;
+  const checked = (b: boolean) => (b ? " checked" : "");
+  return page("Sambutan", `<h2>Sambutan anggota baru</h2>
+${flash}
+<form method="post" action="/dashboard/sambutan" class="card">${csrfField(o.csrf)}
+  <p class="meta">${saved}</p>
+  <div class="field">
+    <label for="w-template">Teks sambutan</label>
+    <textarea id="w-template" name="template" maxlength="1000" required aria-describedby="w-template-hint">${esc(s.template)}</textarea>
+    <p class="hint" id="w-template-hint">Wajib memuat {nama} (diganti nama anggota baru, masing-masing di-mention). {bot} diganti @username bot. Maks. 1000 karakter, saat ini ${s.template.length}. Dikirim apa adanya sebagai teks biasa.</p>
+  </div>
+  <div class="field">
+    <label for="w-topic">ID topik sambutan</label>
+    <input id="w-topic" name="topic_id" type="text" inputmode="numeric" pattern="[0-9]*" value="${esc(s.topicId ?? "")}" aria-describedby="w-topic-hint">
+    <p class="hint" id="w-topic-hint">Kosongkan untuk topik General. Angka ID topik ada di link pesan topik: t.me/c/…/<b>ID</b>/….</p>
+  </div>
+  <div class="field">
+    <label class="check" for="w-welcome"><input id="w-welcome" name="welcome_enabled" type="checkbox" value="on"${checked(s.welcomeEnabled)}> Sambut anggota baru</label>
+    <label class="check" for="w-leave"><input id="w-leave" name="leave_enabled" type="checkbox" value="on"${checked(s.leaveEnabled)}> Kabari saat ada yang keluar</label>
+    <p class="hint">Sambutan dikirim tiap 5 menit untuk semua yang baru bergabung. Kabar keluar dikirim lewat DM ke semua pengguna dashboard.</p>
+  </div>
+  <button type="submit">Simpan</button>
+</form>
+<p class="hint">Fitur ini butuh bot sebagai admin grup dan webhook yang memuat <code>chat_member</code> (lihat panduan setup).</p>`, { user: o.user, csrf: o.csrf, current: "sambutan" });
 }
