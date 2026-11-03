@@ -123,7 +123,12 @@ export const FLASH: Record<string, { text: string; bad?: boolean }> = {
   diklaim: { text: "Pertanyaan berhasil diklaim. Kamu bisa menjawabnya sekarang." },
   "sudah-diklaim": { text: "Sudah diklaim oleh mentor lain.", bad: true },
   dilepas: { text: "Klaim dilepas. Pertanyaan kembali terbuka." },
-  "bukan-klaim": { text: "Kamu tidak sedang mengklaim pertanyaan ini.", bad: true },
+  "bukan-klaim": { text: "Kamu tidak sedang mengklaim pertanyaan ini (atau klaimnya sudah lewat 24 jam, atau sudah dijawab).", bad: true },
+  terkirim: { text: "Jawaban terkirim ke peserta dan diposting di topik grup." },
+  ditahan: { text: "Jawaban disimpan. Peserta belum memulai bot, jadi jawaban dikirim otomatis saat mereka menekan Start." },
+  "gagal-sebagian": { text: "Pertanyaan ditutup, tapi ada pengiriman yang gagal. Lihat status di bawah dan tindak lanjuti manual.", bad: true },
+  kosong: { text: "Jawaban tidak boleh kosong.", bad: true },
+  "terlalu-panjang": { text: "Jawaban maksimal 900 karakter. Tidak ada yang dikirim.", bad: true },
 };
 
 export function fmtTime(d: Date | null): string {
@@ -136,6 +141,17 @@ export function fmtTime(d: Date | null): string {
 }
 
 const STATUS_LABEL = { open: "Terbuka", claimed: "Diklaim", closed: "Selesai" } as const;
+const DM_LABEL = { sent: "terkirim", held: "menunggu peserta menekan Start", failed: "GAGAL" } as const;
+const TOPIC_LABEL = { sent: "terkirim", failed: "GAGAL", skipped: "— (ditanya lewat DM)" } as const;
+
+function closedBlock(f: FollowupView): string {
+  if (!f.replyText) return `<p class="meta">Ditutup tanpa jawaban di dashboard.</p>`;
+  const dm = f.dmStatus ? DM_LABEL[f.dmStatus] : "—";
+  const topic = f.topicStatus ? TOPIC_LABEL[f.topicStatus] : "—";
+  return `<p class="meta">Jawaban dari ${esc(f.repliedByName ?? "mentor")} · ${esc(fmtTime(f.repliedAt))}</p>
+  <p class="q">${esc(f.replyText)}</p>
+  <p class="meta">DM ke peserta: ${esc(dm)} · Topik grup: ${esc(topic)}</p>`;
+}
 
 function itemCard(f: FollowupView, me: DashUser, csrf: string): string {
   const where = f.viaDm ? "Lewat DM" : f.threadId !== null ? `Topik #${f.threadId}` : "Grup";
@@ -146,7 +162,17 @@ function itemCard(f: FollowupView, me: DashUser, csrf: string): string {
 
   let actions = "";
   if (f.status === "open") actions = `<div class="row">${action("claim", "Klaim")}</div>`;
-  else if (f.status === "claimed" && f.claimedByEmail === me.email) actions = `<div class="row">${action("release", "Lepas", "secondary")}</div>`;
+  else if (f.status === "claimed" && f.claimedByEmail === me.email) {
+    actions = `<form method="post" action="/dashboard/followups/${f.id}/reply">${csrfField(csrf)}
+    <div class="field">
+      <label for="r-${f.id}">Jawaban kamu</label>
+      <textarea id="r-${f.id}" name="reply" maxlength="900" required aria-describedby="r-${f.id}-hint"></textarea>
+      <p class="hint" id="r-${f.id}-hint">Maks. 900 karakter. Dikirim apa adanya ke peserta lewat DM, dan juga diposting di topik grup.</p>
+    </div>
+    <div class="row"><button type="submit">Kirim</button></div>
+  </form>
+  <div class="row">${action("release", "Lepas", "secondary")}</div>`;
+  } else if (f.status === "closed") actions = closedBlock(f);
 
   return `<article class="card" id="f-${f.id}" aria-labelledby="f-${f.id}-q">
   <p class="meta">${esc(where)} · ${esc(fmtTime(f.createdAt))} · <span class="badge s-${f.status}">${esc(status)}</span></p>

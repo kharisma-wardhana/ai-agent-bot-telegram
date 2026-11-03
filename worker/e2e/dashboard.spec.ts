@@ -54,3 +54,22 @@ test("claim: a signed-in mentor claims an open question from the list and can re
   await page.locator(`#f-${id}`).getByRole("button", { name: "Lepas" }).click();
   await expect(page.locator(`#f-${id}`)).toContainText("Terbuka");
 });
+
+test("reply: claim → type a reply → Kirim delivers it and the question shows under Selesai", async ({ page, request }) => {
+  const { id } = await (await request.post("/__test/followup?q=Apa%20itu%20RAG%3F&learner=501&name=Ani")).json();
+  await login(page, request);
+  await page.locator(`#f-${id}`).getByRole("button", { name: "Klaim" }).click();
+  await page.getByLabel("Jawaban kamu").fill("RAG menggabungkan pencarian dokumen dengan model bahasa.");
+  await page.getByRole("button", { name: "Kirim" }).click();
+
+  await expect(page).toHaveURL(/tab=selesai/);
+  await expect(page.getByRole("status")).toContainText("Jawaban terkirim");
+  const card = page.locator(`#f-${id}`);
+  await expect(card).toContainText("RAG menggabungkan pencarian dokumen");
+  await expect(card).toContainText("DM ke peserta: terkirim");
+
+  const calls = (await (await request.get("/__test/calls")).json()) as { method: string; params: Record<string, unknown> }[];
+  const sends = calls.filter((c) => c.method === "sendMessage");
+  expect(sends.filter((c) => c.params.chat_id === 501)).toHaveLength(1);
+  expect(sends.filter((c) => c.params.chat_id === -1001234567890)).toHaveLength(1);
+});

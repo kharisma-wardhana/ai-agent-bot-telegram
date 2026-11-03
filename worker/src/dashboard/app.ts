@@ -7,7 +7,7 @@ import {
   clearSessionCookies, dashboardOrigin, originOk, requestLoginLink, requireSession, setSessionCookies, startSession,
   withDeps, type DashEnv,
 } from "./auth";
-import { claimFollowup, followupImage, listFollowups, releaseFollowup } from "./followups";
+import { claimFollowup, followupImage, listFollowups, releaseFollowup, replyToFollowup } from "./followups";
 import { authConfirmPage, authFailedPage, listPage, loginPage } from "./views";
 
 export function dashboardApp(): Hono<DashEnv> {
@@ -67,6 +67,19 @@ export function dashboardApp(): Hono<DashEnv> {
     const id = Number(c.req.param("id"));
     const ok = await releaseFollowup(c.var.deps, c.var.user, id);
     return c.redirect(back(ok ? "dilepas" : "bukan-klaim", id), 303);
+  });
+
+  // ---------- Reply (AC 12–15) ----------
+  app.post("/followups/:id{[0-9]+}/reply", async (c) => {
+    const id = Number(c.req.param("id"));
+    const body = await c.req.parseBody();
+    const r = await replyToFollowup(c.var.deps, c.var.user, id, typeof body.reply === "string" ? body.reply : "");
+    if (r.kind !== "delivered") {
+      const why = { empty: "kosong", "too-long": "terlalu-panjang", "not-claimer": "bukan-klaim" } as const;
+      return c.redirect(back(why[r.kind], id), 303);
+    }
+    const pesan = r.dm === "failed" || r.topic === "failed" ? "gagal-sebagian" : r.dm === "held" ? "ditahan" : "terkirim";
+    return c.redirect(back(pesan, id, "selesai"), 303);
   });
 
   // ---------- Image proxy (AC 19) ----------
