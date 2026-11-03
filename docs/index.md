@@ -21,3 +21,5 @@ Project-wide review checklist: [REVIEW.md](../REVIEW.md)
   - [ops-tools.md](mentor-followup-dashboard/ops-tools.md): dashboard additions to deploy/status/rollback (documented, not wired)
   - [pr.md](mentor-followup-dashboard/pr.md): pull request description, ready to paste
   - [monitoring.md](mentor-followup-dashboard/monitoring.md): reuses the fallback-rate control band; weekly delivery/claim checks; loop closure
+- **cohort-welcome-message**: automatic batched welcome for new cohort members (dashboard-editable text); leave notices DMed to dashboard users
+  - [intent.md](cohort-welcome-message/intent.md)
