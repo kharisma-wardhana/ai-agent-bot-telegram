@@ -11,4 +11,4 @@
 - [x] 7. Mentor management — spec AC: #7, #18
 - [x] 8. Add to knowledge — spec AC: #16, #17
 - [x] 9. Phone layout and accessibility markup — spec AC: #21
-- [ ] 10. Operator docs — spec AC: none (deploy readiness)
+- [x] 10. Operator docs — spec AC: none (deploy readiness)
