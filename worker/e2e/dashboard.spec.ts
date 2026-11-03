@@ -55,6 +55,27 @@ test("claim: a signed-in mentor claims an open question from the list and can re
   await expect(page.locator(`#f-${id}`)).toContainText("Terbuka");
 });
 
+test("mentors: add a mentor, the new mentor can sign in, then remove them", async ({ page, request, browser }) => {
+  await login(page, request);
+  await page.getByRole("link", { name: "Mentor" }).click();
+  await expect(page.getByText("pemilik (config)")).toBeVisible();
+  await page.getByLabel("Nama").fill("Mentor Tiga");
+  await page.getByLabel("Email").fill("tiga@skilly.id");
+  await page.getByLabel("Telegram ID").fill("333");
+  await page.getByRole("button", { name: "Tambah" }).click();
+  await expect(page.getByRole("status")).toContainText("Mentor ditambahkan");
+
+  const other = await browser.newPage({ viewport: { width: 360, height: 740 } });
+  await login(other, request, "tiga@skilly.id", 333);
+  await expect(other.getByRole("heading", { name: "Pertanyaan aktif" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Hapus Mentor Tiga" }).click();
+  await expect(page.getByRole("status")).toContainText("Mentor dihapus");
+  await other.reload();
+  await expect(other).toHaveURL(/\/dashboard\/login$/);
+  await other.close();
+});
+
 test("reply: claim → type a reply → Kirim delivers it and the question shows under Selesai", async ({ page, request }) => {
   const { id } = await (await request.post("/__test/followup?q=Apa%20itu%20RAG%3F&learner=501&name=Ani")).json();
   await login(page, request);

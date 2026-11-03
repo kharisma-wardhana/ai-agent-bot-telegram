@@ -182,6 +182,39 @@ function itemCard(f: FollowupView, me: DashUser, csrf: string): string {
 </article>`;
 }
 
+// ---------- Mentor management ----------
+export const USER_FLASH: Record<string, { text: string; bad?: boolean }> = {
+  ditambah: { text: "Mentor ditambahkan. Mereka bisa masuk dengan email itu dan akan menerima DM follow-up." },
+  "sudah-ada": { text: "Email itu sudah terdaftar.", bad: true },
+  "tidak-valid": { text: "Isi nama (maks. 60 karakter), email yang valid, dan Telegram ID berupa angka.", bad: true },
+  dihapus: { text: "Mentor dihapus. Sesi masuk mereka langsung berakhir." },
+  "tidak-ditemukan": { text: "Mentor tidak ditemukan (mungkin sudah dihapus).", bad: true },
+};
+
+export function mentorPage(o: { user: DashUser; csrf: string; users: DashUser[]; flash?: string }): string {
+  const f = o.flash ? USER_FLASH[o.flash] : undefined;
+  const flash = f ? `<p class="card flash${f.bad ? " bad" : ""}" role="${f.bad ? "alert" : "status"}">${esc(f.text)}</p>` : "";
+  const rows = o.users.map((u) => `<article class="card">
+  <p class="q"><strong>${esc(u.displayName)}</strong>${u.email === o.user.email ? " (kamu)" : ""}</p>
+  <p class="meta">${esc(u.email)}${u.bootstrap ? ` · <span class="badge">pemilik (config)</span>` : ""}</p>
+  ${u.bootstrap || u.id === null ? "" : `<form method="post" action="/dashboard/mentor/${u.id}/remove" class="inline">${csrfField(o.csrf)}<button type="submit" class="danger" aria-label="Hapus ${esc(u.displayName)}">Hapus</button></form>`}
+</article>`).join("\n");
+  return page("Mentor", `<h2>Mentor</h2>
+${flash}
+${rows}
+<h2>Tambah mentor</h2>
+<form method="post" action="/dashboard/mentor" class="card">${csrfField(o.csrf)}
+  <div class="field"><label for="m-name">Nama</label><input id="m-name" name="name" type="text" maxlength="60" required autocomplete="off"></div>
+  <div class="field"><label for="m-email">Email</label><input id="m-email" name="email" type="email" inputmode="email" required autocomplete="off"></div>
+  <div class="field">
+    <label for="m-tid">Telegram ID</label>
+    <input id="m-tid" name="telegram_id" type="text" inputmode="numeric" pattern="[0-9]+" required autocomplete="off" aria-describedby="m-tid-hint">
+    <p class="hint" id="m-tid-hint">Angka ID akun Telegram (bukan username). Link masuk dan DM follow-up dikirim ke akun ini.</p>
+  </div>
+  <button type="submit">Tambah</button>
+</form>`, { user: o.user, csrf: o.csrf, current: "mentor" });
+}
+
 export function listPage(o: { user: DashUser; csrf: string; tab: "aktif" | "selesai"; items: FollowupView[]; flash?: string; flashId?: number }): string {
   const title = o.tab === "selesai" ? "Pertanyaan selesai" : "Pertanyaan aktif";
   let flash = "";

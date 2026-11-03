@@ -8,7 +8,8 @@ import {
   withDeps, type DashEnv,
 } from "./auth";
 import { claimFollowup, followupImage, listFollowups, releaseFollowup, replyToFollowup } from "./followups";
-import { authConfirmPage, authFailedPage, listPage, loginPage } from "./views";
+import { addUser, listUsers, removeUser } from "./users";
+import { authConfirmPage, authFailedPage, listPage, loginPage, mentorPage } from "./views";
 
 export function dashboardApp(): Hono<DashEnv> {
   const app = new Hono<DashEnv>();
@@ -80,6 +81,25 @@ export function dashboardApp(): Hono<DashEnv> {
     }
     const pesan = r.dm === "failed" || r.topic === "failed" ? "gagal-sebagian" : r.dm === "held" ? "ditahan" : "terkirim";
     return c.redirect(back(pesan, id, "selesai"), 303);
+  });
+
+  // ---------- Mentor management (AC 7, 18) ----------
+  app.get("/mentor", async (c) =>
+    c.html(mentorPage({ user: c.var.user, csrf: c.var.csrf, users: await listUsers(c.var.deps), flash: c.req.query("pesan") })));
+
+  app.post("/mentor", async (c) => {
+    const b = await c.req.parseBody();
+    const s = (k: string) => (typeof b[k] === "string" ? (b[k] as string) : "");
+    const r = await addUser(c.var.deps, c.var.user, { name: s("name"), email: s("email"), telegramId: s("telegram_id") });
+    const pesan = { added: "ditambah", exists: "sudah-ada", invalid: "tidak-valid" }[r];
+    return c.redirect(`/dashboard/mentor?pesan=${pesan}`, 303);
+  });
+
+  app.post("/mentor/:key/remove", async (c) => {
+    const key = c.req.param("key");
+    if (!/^[0-9]+$/.test(key)) return c.text("Pemilik (config) tidak bisa dihapus dari dashboard.", 403);
+    const ok = await removeUser(c.var.deps, Number(key));
+    return c.redirect(`/dashboard/mentor?pesan=${ok ? "dihapus" : "tidak-ditemukan"}`, 303);
   });
 
   // ---------- Image proxy (AC 19) ----------
