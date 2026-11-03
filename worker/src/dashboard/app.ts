@@ -7,7 +7,8 @@ import {
   clearSessionCookies, dashboardOrigin, originOk, requestLoginLink, requireSession, setSessionCookies, startSession,
   withDeps, type DashEnv,
 } from "./auth";
-import { authConfirmPage, authFailedPage, loginPage, page } from "./views";
+import { claimFollowup, followupImage, listFollowups, releaseFollowup } from "./followups";
+import { authConfirmPage, authFailedPage, listPage, loginPage } from "./views";
 
 export function dashboardApp(): Hono<DashEnv> {
   const app = new Hono<DashEnv>();
@@ -45,8 +46,35 @@ export function dashboardApp(): Hono<DashEnv> {
     return c.redirect("/dashboard/login", 303);
   });
 
-  app.get("/", (c) =>
-    c.html(page("Pertanyaan aktif", `<h2>Pertanyaan aktif</h2>`, { user: c.var.user, csrf: c.var.csrf, current: "aktif" })));
+  // ---------- Follow-up list (AC 8, 9) ----------
+  app.get("/", async (c) => {
+    const tab = c.req.query("tab") === "selesai" ? "selesai" : "aktif";
+    const items = await listFollowups(c.var.deps, tab === "selesai" ? "closed" : "active");
+    const flashId = Number(c.req.query("id"));
+    return c.html(listPage({ user: c.var.user, csrf: c.var.csrf, tab, items, flash: c.req.query("pesan"), flashId: Number.isFinite(flashId) ? flashId : undefined }));
+  });
+
+  const back = (pesan: string, id: number, tab = "") => `/dashboard?${tab ? `tab=${tab}&` : ""}pesan=${pesan}&id=${id}#f-${id}`;
+
+  // ---------- Claim / release (AC 10, 11) ----------
+  app.post("/followups/:id{[0-9]+}/claim", async (c) => {
+    const id = Number(c.req.param("id"));
+    const r = await claimFollowup(c.var.deps, c.var.user, id);
+    return c.redirect(back(r.claimed ? "diklaim" : "sudah-diklaim", id), 303);
+  });
+
+  app.post("/followups/:id{[0-9]+}/release", async (c) => {
+    const id = Number(c.req.param("id"));
+    const ok = await releaseFollowup(c.var.deps, c.var.user, id);
+    return c.redirect(back(ok ? "dilepas" : "bukan-klaim", id), 303);
+  });
+
+  // ---------- Image proxy (AC 19) ----------
+  app.get("/followups/:id{[0-9]+}/image", async (c) => {
+    const img = await followupImage(c.var.deps, Number(c.req.param("id")));
+    if (!img) return c.text("not found", 404);
+    return c.body(img.bytes, 200, { "Content-Type": img.type });
+  });
 
   return app;
 }

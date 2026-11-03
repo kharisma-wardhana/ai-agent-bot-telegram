@@ -11,7 +11,8 @@ export default defineConfig({
       },
       {
         // SQL migrations and functions, run on PGlite + pgvector in Node.
-        test: { name: "db", environment: "node", include: ["test/db/**/*.test.ts"] },
+        // PGlite + pgvector boots in beforeEach; under the parallel suite that can exceed the 10 s default hook timeout.
+        test: { name: "db", environment: "node", include: ["test/db/**/*.test.ts"], testTimeout: 30_000, hookTimeout: 30_000 },
       },
     ],
   },

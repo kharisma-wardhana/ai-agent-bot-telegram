@@ -6,7 +6,7 @@
 - [x] 2. Repository layer — spec AC: #5, #10, #11
 - [x] 3. Config, Telegram mentions, fallback recipients and link — spec AC: #18, #8
 - [x] 4. Dashboard skeleton and login — spec AC: #1, #2, #3, #4, #5, #6
-- [ ] 5. Follow-up list, claim/release, image proxy — spec AC: #8, #9, #10, #11, #19, #20
+- [x] 5. Follow-up list, claim/release, image proxy — spec AC: #8, #9, #10, #11, #19, #20
 - [ ] 6. Reply delivery — spec AC: #12, #13, #14, #15
 - [ ] 7. Mentor management — spec AC: #7, #18
 - [ ] 8. Add to knowledge — spec AC: #16, #17

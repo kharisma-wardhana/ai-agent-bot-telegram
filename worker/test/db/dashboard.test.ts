@@ -1,15 +1,12 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { PGlite as PGliteCtor } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { RpcRepository } from "../../src/db/repository";
 import { freshDb, migrationFiles, migrationSql } from "./helpers";
 import { PgliteRpc } from "./pglite-rpc";
 
 // Regression for docs/mentor-followup-dashboard/spec.md (AC 5, 8, 10, 11, 22), at the SQL level.
-
-// Every test builds a PGlite + pgvector instance; under the parallel full suite that alone can exceed 5 s.
-vi.setConfig({ testTimeout: 30_000 });
 
 let db: PGlite;
 const DAY = 24 * 3600;

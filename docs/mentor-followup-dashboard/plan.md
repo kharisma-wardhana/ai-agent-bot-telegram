@@ -35,6 +35,7 @@ Requirements are not restated here. Each step links to [spec.md › Acceptance c
 - `worker/e2e/dashboard.spec.ts` (new): Playwright main flows.
 - `worker/e2e/tsconfig.json` (new): Node types for the e2e folder, which runs outside the Workers runtime. The `typecheck` script in `worker/package.json` gains `tsc --noEmit -p e2e`. *(amended during build, step 4)*
 - `.gitignore` (edit): ignore `worker/test-results/` and `worker/playwright-report/` (Playwright output). *(amended during build, step 4)*
+- `worker/vitest.config.ts` (edit): `db` project gets `testTimeout`/`hookTimeout` of 30 s. With more test files running in parallel, booting PGlite + pgvector in `beforeEach` exceeded the 10 s default hook timeout, including in the pre-existing `schema.test.ts`. *(amended during build, step 5)*
 - `worker/test/fakes/fake-repository.ts`, `worker/test/fakes/harness.ts` (edit): fake implementations of the new repository methods, the dashboard env vars, and a `dashboard()` request helper.
 - `worker/test/db/dashboard.test.ts` (new): migration and SQL regression on PGlite + pgvector.
 - `worker/test/dashboard-auth.test.ts`, `dashboard-followups.test.ts`, `dashboard-reply.test.ts`, `dashboard-knowledge.test.ts`, `dashboard-users.test.ts`, `dashboard-markup.test.ts`, `fallback-dashboard.test.ts` (new): integration tests at the HTTP entry point.

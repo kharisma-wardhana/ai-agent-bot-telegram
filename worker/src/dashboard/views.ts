@@ -2,6 +2,7 @@
  * Server-rendered dashboard HTML. Every dynamic value goes through esc() (spec AC 20).
  * No JavaScript: the CSP forbids scripts. Mobile-first, Bahasa Indonesia (spec › Behaviour, AC 21).
  */
+import type { FollowupView } from "../db/repository";
 import type { DashUser } from "./auth";
 
 export function esc(v: unknown): string {
@@ -113,4 +114,59 @@ export function authFailedPage(): string {
 <h2>Link tidak berlaku</h2>
 <p class="card flash bad" role="alert">Link masuk sudah dipakai, kedaluwarsa, atau tidak dikenal. Minta link baru.</p>
 <p><a class="link" href="/dashboard/login">Minta link baru</a></p>`);
+}
+
+// ---------- Follow-up list ----------
+
+/** Flash messages, keyed by the `pesan` query value. Unknown keys show nothing. */
+export const FLASH: Record<string, { text: string; bad?: boolean }> = {
+  diklaim: { text: "Pertanyaan berhasil diklaim. Kamu bisa menjawabnya sekarang." },
+  "sudah-diklaim": { text: "Sudah diklaim oleh mentor lain.", bad: true },
+  dilepas: { text: "Klaim dilepas. Pertanyaan kembali terbuka." },
+  "bukan-klaim": { text: "Kamu tidak sedang mengklaim pertanyaan ini.", bad: true },
+};
+
+export function fmtTime(d: Date | null): string {
+  if (!d) return "";
+  try {
+    return d.toLocaleString("id-ID", { timeZone: "Asia/Jakarta", dateStyle: "medium", timeStyle: "short" }) + " WIB";
+  } catch {
+    return d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
+  }
+}
+
+const STATUS_LABEL = { open: "Terbuka", claimed: "Diklaim", closed: "Selesai" } as const;
+
+function itemCard(f: FollowupView, me: DashUser, csrf: string): string {
+  const where = f.viaDm ? "Lewat DM" : f.threadId !== null ? `Topik #${f.threadId}` : "Grup";
+  const status = f.status === "claimed" ? `Diklaim oleh ${f.claimedByName ?? "mentor"}` : STATUS_LABEL[f.status];
+  const photo = f.hasPhoto ? `<img class="photo" src="/dashboard/followups/${f.id}/image" alt="Gambar yang dikirim bersama pertanyaan" loading="lazy">` : "";
+  const action = (path: string, label: string, cls = "") =>
+    `<form method="post" action="/dashboard/followups/${f.id}/${path}" class="inline">${csrfField(csrf)}<button type="submit"${cls ? ` class="${cls}"` : ""}>${esc(label)}</button></form>`;
+
+  let actions = "";
+  if (f.status === "open") actions = `<div class="row">${action("claim", "Klaim")}</div>`;
+  else if (f.status === "claimed" && f.claimedByEmail === me.email) actions = `<div class="row">${action("release", "Lepas", "secondary")}</div>`;
+
+  return `<article class="card" id="f-${f.id}" aria-labelledby="f-${f.id}-q">
+  <p class="meta">${esc(where)} · ${esc(fmtTime(f.createdAt))} · <span class="badge s-${f.status}">${esc(status)}</span></p>
+  <p class="q" id="f-${f.id}-q">${esc(f.question || "(tanpa teks)")}</p>
+  ${photo}
+  ${actions}
+</article>`;
+}
+
+export function listPage(o: { user: DashUser; csrf: string; tab: "aktif" | "selesai"; items: FollowupView[]; flash?: string; flashId?: number }): string {
+  const title = o.tab === "selesai" ? "Pertanyaan selesai" : "Pertanyaan aktif";
+  let flash = "";
+  const f = o.flash ? FLASH[o.flash] : undefined;
+  if (f) {
+    const who = o.flash === "sudah-diklaim" ? o.items.find((i) => i.id === o.flashId)?.claimedByName : null;
+    const text = who ? `Sudah diklaim oleh ${who}.` : f.text;
+    flash = `<p class="card flash${f.bad ? " bad" : ""}" role="${f.bad ? "alert" : "status"}">${esc(text)}</p>`;
+  }
+  const body = o.items.length
+    ? o.items.map((i) => itemCard(i, o.user, o.csrf)).join("\n")
+    : `<p class="empty">${o.tab === "selesai" ? "Belum ada pertanyaan yang selesai." : "Tidak ada pertanyaan yang menunggu. 🎉"}</p>`;
+  return page(title, `<h2>${esc(title)}</h2>\n${flash}\n${body}`, { user: o.user, csrf: o.csrf, current: o.tab });
 }

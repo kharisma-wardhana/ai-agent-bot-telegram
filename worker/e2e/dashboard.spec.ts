@@ -41,3 +41,16 @@ test("login: a used link can't be used twice", async ({ page, request }) => {
   await page.getByRole("button", { name: "Masuk" }).click();
   await expect(page.getByRole("heading", { name: "Link tidak berlaku" })).toBeVisible();
 });
+
+test("claim: a signed-in mentor claims an open question from the list and can release it", async ({ page, request }) => {
+  const { id } = await (await request.post("/__test/followup?q=Bagaimana%20cara%20kerja%20embedding%3F")).json();
+  await login(page, request);
+  const card = page.locator(`#f-${id}`);
+  await expect(card).toContainText("Bagaimana cara kerja embedding?");
+  await expect(card).toContainText("Terbuka");
+  await card.getByRole("button", { name: "Klaim" }).click();
+  await expect(page.getByRole("status")).toContainText("berhasil diklaim");
+  await expect(page.locator(`#f-${id}`)).toContainText("Diklaim oleh owner");
+  await page.locator(`#f-${id}`).getByRole("button", { name: "Lepas" }).click();
+  await expect(page.locator(`#f-${id}`)).toContainText("Terbuka");
+});
