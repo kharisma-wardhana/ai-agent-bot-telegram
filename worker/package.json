@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "wrangler dev --local",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p test/db",
-    "lint": "tsc --noEmit && tsc --noEmit -p test/db",
-    "format": "prettier --write src test"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test/db && tsc --noEmit -p e2e",
+    "lint": "tsc --noEmit && tsc --noEmit -p test/db && tsc --noEmit -p e2e",
+    "format": "prettier --write src test",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "hono": "^4.13.16"
@@ -17,8 +18,11 @@
     "@cloudflare/workers-types": "^5.20261101.1",
     "@electric-sql/pglite": "^0.5.9",
     "@electric-sql/pglite-pgvector": "0.0.10",
+    "@hono/node-server": "^2.1.5",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^24.19.2",
     "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5",
     "wrangler": "^4.156.0"

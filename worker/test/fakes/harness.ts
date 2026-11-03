@@ -36,6 +36,31 @@ export interface Harness {
   send(update: TgUpdate, secret?: string): Promise<Response>;
   drain(userId: number): Promise<void>;
   seed(title: string, text: string): Promise<void>;
+  /** Request to /dashboard/* through the real Worker entry point. Origin defaults to ours; null omits it. */
+  dash(path: string, o?: DashRequest): Promise<Response>;
+  /** Drives the real magic-link flow (login form → DM → POST /auth) and returns the session cookies. */
+  login(email: string, telegramId: number): Promise<DashSession>;
+}
+
+export interface DashRequest { method?: "GET" | "POST"; form?: Record<string, string>; session?: DashSession; origin?: string | null; headers?: Record<string, string> }
+export interface DashSession { cookie: string; csrf: string; sid: string }
+
+/** Cookies from a response's Set-Cookie headers, name → value. */
+export function setCookies(res: Response): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of res.headers.getSetCookie()) {
+    const [pair] = line.split(";");
+    const i = pair!.indexOf("=");
+    out[pair!.slice(0, i).trim()] = decodeURIComponent(pair!.slice(i + 1).trim());
+  }
+  return out;
+}
+
+/** The login link token from the last login DM sent to a chat. */
+export function loginTokenFrom(tg: FakeTelegram, chatId: number): string | null {
+  const t = tg.textsIn(chatId).filter((x) => x.includes("/dashboard/auth?t=")).at(-1);
+  const m = t ? /\/dashboard\/auth\?t=([A-Za-z0-9_%-]+)/.exec(t) : null;
+  return m ? decodeURIComponent(m[1]!) : null;
 }
 
 export function makeHarness(opts: { heartbeatAge?: number | null } = {}): Harness {
@@ -80,6 +105,34 @@ export function makeHarness(opts: { heartbeatAge?: number | null } = {}): Harnes
         await new Promise((r) => setTimeout(r, 10));
       }
       throw new Error(`learner ${userId} session never became idle`);
+    },
+    dash: (path, o = {}) => {
+      const headers: Record<string, string> = { Accept: "text/html", ...(o.headers ?? {}) };
+      if (o.origin !== null) headers.Origin = o.origin ?? DASH_BASE;
+      if (o.session) headers.Cookie = o.session.cookie;
+      let body: string | undefined;
+      if (o.form) {
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        body = new URLSearchParams(o.form).toString();
+      }
+      return (exports as unknown as { default: Fetcher }).default.fetch(new Request(`${DASH_BASE}${path}`, {
+        method: o.method ?? (o.form ? "POST" : "GET"), headers, body, redirect: "manual",
+      }));
+    },
+    login: async (email, telegramId) => {
+      const fetchDash = (path: string, form: Record<string, string>) =>
+        (exports as unknown as { default: Fetcher }).default.fetch(new Request(`${DASH_BASE}${path}`, {
+          method: "POST", redirect: "manual",
+          headers: { Origin: DASH_BASE, "Content-Type": "application/x-www-form-urlencoded", Accept: "text/html" },
+          body: new URLSearchParams(form).toString(),
+        }));
+      await fetchDash("/dashboard/login", { email });
+      const t = loginTokenFrom(tg, telegramId);
+      if (!t) throw new Error(`no login link sent to ${telegramId}`);
+      const res = await fetchDash("/dashboard/auth", { t });
+      const c = setCookies(res);
+      if (!c.sk_sess || !c.sk_csrf) throw new Error(`login failed (${res.status})`);
+      return { cookie: `sk_sess=${c.sk_sess}; sk_csrf=${c.sk_csrf}`, csrf: c.sk_csrf, sid: c.sk_sess };
     },
     seed: async (title, text) => {
       const [v] = await embedder.embed([text]);

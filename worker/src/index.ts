@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "./config";
+import { dashboardApp } from "./dashboard/app";
 import { getDeps, type Deps } from "./deps";
 import { bearerOk, handleMcp } from "./mcp/server";
 import type { DeferredImage } from "./media/image";
@@ -13,6 +14,9 @@ export { LearnerSession } from "./pipeline/learner-session";
 const app = new Hono<{ Bindings: Env }>();
 
 app.get("/health", (c) => c.json({ ok: true }));
+
+/** Mentor follow-up dashboard (docs/mentor-followup-dashboard). */
+app.route("/dashboard", dashboardApp());
 
 /** Constant-time string comparison for secrets. */
 export function safeEqual(a: string, b: string): boolean {

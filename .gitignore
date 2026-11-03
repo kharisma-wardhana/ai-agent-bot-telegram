@@ -12,3 +12,7 @@ __pycache__/
 lesson-docs/*_files/
 # local output of eval/run_eval.py (contains bot answers)
 eval/results.json
+
+# Playwright output (mentor-followup-dashboard e2e)
+worker/test-results/
+worker/playwright-report/
