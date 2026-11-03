@@ -23,3 +23,4 @@ Project-wide review checklist: [REVIEW.md](../REVIEW.md)
   - [monitoring.md](mentor-followup-dashboard/monitoring.md): reuses the fallback-rate control band; weekly delivery/claim checks; loop closure
 - **cohort-welcome-message**: automatic batched welcome for new cohort members (dashboard-editable text); leave notices DMed to dashboard users
   - [intent.md](cohort-welcome-message/intent.md)
+  - [spec.md](cohort-welcome-message/spec.md)
