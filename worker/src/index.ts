@@ -8,6 +8,7 @@ import { runMemoryJob } from "./memory/graph-extractor";
 import type { DeferredImageEvent, LearnerSession } from "./pipeline/learner-session";
 import { classify } from "./telegram/parse-update";
 import type { TgUpdate } from "./telegram/types";
+import { handleMemberJoin, handleMemberLeave } from "./welcome/welcome";
 
 export { LearnerSession } from "./pipeline/learner-session";
 
@@ -45,6 +46,17 @@ app.post("/telegram/webhook", async (c) => {
   }
   const event = classify(update, d.cfg);
   if (event.kind === "ignore") return c.json({ ok: true });
+
+  // Joins/leaves (cohort-welcome-message): one DB write or a few DMs, handled here rather than in the learner DO.
+  if (event.kind === "member_join" || event.kind === "member_leave") {
+    try {
+      if (event.kind === "member_join") await handleMemberJoin(d, event.from);
+      else await handleMemberLeave(d, event.from, event.kicked);
+    } catch (e) {
+      console.error(`${event.kind} failed`, (e as Error).message);
+    }
+    return c.json({ ok: true });
+  }
 
   await learnerStub(c.env, event.from.id).enqueue(event);
   return c.json({ ok: true });
