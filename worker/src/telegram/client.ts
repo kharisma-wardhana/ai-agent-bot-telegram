@@ -20,7 +20,11 @@ export interface SendOptions {
   replyTo?: number;
   replyMarkup?: InlineKeyboard;
   linkPreview?: boolean;
+  /** Explicit entities (e.g. a text_mention). Offsets are UTF-16 code units, which is JS string indexing. */
+  entities?: MessageEntity[];
 }
+
+export interface MessageEntity { type: "text_mention"; offset: number; length: number; user: { id: number; is_bot: false; first_name: string } }
 
 /** Thin Bot API client. All text is sent as plain text (no parse_mode) so learner/LLM text can't break formatting. */
 export class TelegramClient {
@@ -58,6 +62,7 @@ export class TelegramClient {
       reply_parameters: o.replyTo ? { message_id: o.replyTo, allow_sending_without_reply: true } : undefined,
       reply_markup: o.replyMarkup,
       link_preview_options: { is_disabled: !o.linkPreview },
+      entities: o.entities,
     });
   }
 

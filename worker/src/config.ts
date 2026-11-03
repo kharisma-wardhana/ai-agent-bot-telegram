@@ -24,6 +24,8 @@ export interface Env {
   HEARTBEAT_MAX_AGE_S?: string;
   MAX_ANSWER_CHARS?: string;
   SESSION_TTL_HOURS?: string;
+  DASHBOARD_OWNERS?: string; // "email:telegramId,…" (mentor-followup-dashboard bootstrap users)
+  DASHBOARD_BASE_URL?: string; // public origin used in dashboard links, e.g. https://bot.example.com
 }
 
 export interface Config {
@@ -43,7 +45,12 @@ export interface Config {
   heartbeatMaxAgeS: number;
   maxAnswerChars: number;
   sessionTtlHours: number;
+  dashboardOwners: DashboardOwner[];
+  dashboardBaseUrl: string | null;
 }
+
+/** A bootstrap dashboard user from config: can't be removed from the dashboard. */
+export interface DashboardOwner { email: string; telegramId: number; displayName: string }
 
 export class ConfigError extends Error {}
 
@@ -71,6 +78,28 @@ function num(value: string | undefined, key: string, fallback: number, min: numb
   return n;
 }
 
+const EMAIL = /^[^\s@:,]+@[^\s@:,]+\.[^\s@:,]+$/;
+
+/** "a@x.id:111, b@y.id:222" → owners. Empty or unset → none. */
+export function parseDashboardOwners(value: string | undefined): DashboardOwner[] {
+  if (value === undefined || value.trim() === "") return [];
+  return value.split(",").map((s) => s.trim()).filter(Boolean).map((pair) => {
+    const i = pair.lastIndexOf(":");
+    const email = (i > 0 ? pair.slice(0, i) : "").trim().toLowerCase();
+    if (!EMAIL.test(email)) throw new ConfigError(`Config DASHBOARD_OWNERS entries must be email:telegramId, got "${pair}"`);
+    return { email, telegramId: int(pair.slice(i + 1), "DASHBOARD_OWNERS"), displayName: email.split("@")[0]! };
+  });
+}
+
+function baseUrl(value: string | undefined): string | null {
+  if (value === undefined || value.trim() === "") return null;
+  const v = value.trim().replace(/\/+$/, "");
+  if (!/^https:\/\/[^/\s]+$/.test(v) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(v)) {
+    throw new ConfigError(`Config DASHBOARD_BASE_URL must be an https origin (no path), got "${value}"`);
+  }
+  return v;
+}
+
 export function parseConfig(env: Env): Config {
   const e = env as unknown as Record<string, unknown>;
   const mentorIds = idList(required(e, "MENTOR_IDS"), "MENTOR_IDS");
@@ -91,5 +120,7 @@ export function parseConfig(env: Env): Config {
     heartbeatMaxAgeS: num(env.HEARTBEAT_MAX_AGE_S, "HEARTBEAT_MAX_AGE_S", 90, 10, 3600),
     maxAnswerChars: num(env.MAX_ANSWER_CHARS, "MAX_ANSWER_CHARS", 1000, 100, 4096),
     sessionTtlHours: num(env.SESSION_TTL_HOURS, "SESSION_TTL_HOURS", 24, 1, 168),
+    dashboardOwners: parseDashboardOwners(env.DASHBOARD_OWNERS),
+    dashboardBaseUrl: baseUrl(env.DASHBOARD_BASE_URL),
   };
 }

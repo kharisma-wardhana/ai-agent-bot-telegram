@@ -13,6 +13,9 @@ import { BOT, FakeTelegram, GROUP_ID } from "./fake-telegram";
 export const WEBHOOK_SECRET = "hook-secret";
 export const MENTORS = [111, 222];
 export const WHITELIST = [111];
+/** Bootstrap dashboard owner (config). Shares Telegram ID 111 with a mentor so de-duplication is exercised. */
+export const OWNER = { email: "owner@skilly.id", telegramId: 111 };
+export const DASH_BASE = "https://bot.test";
 
 /** Default model behaviour: answer from the documents block, or NOT_FOUND if it's empty. */
 export const groundedScript: Script = (req) => {
@@ -49,6 +52,7 @@ export function makeHarness(opts: { heartbeatAge?: number | null } = {}): Harnes
     MCP_TOKENS: "mcp-token", BOT_USERNAME: BOT, GROUP_CHAT_ID: String(GROUP_ID), MENTOR_IDS: MENTORS.join(","),
     KNOWLEDGE_WHITELIST_IDS: WHITELIST.join(","), SUPABASE_URL: "https://fake.supabase.co", KAGGLE_BASE_URL: "https://kaggle.fake",
     RETRIEVAL_THRESHOLD: "0.3",
+    DASHBOARD_OWNERS: `${OWNER.email}:${OWNER.telegramId}`, DASHBOARD_BASE_URL: DASH_BASE,
   } as Env;
   const cfg = parseConfig(testEnv);
   const deps: Deps = {
