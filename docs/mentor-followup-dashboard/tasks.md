@@ -2,7 +2,7 @@
 *Author: Kharisma Wardhana. Stage: Build. Written: 2026-11-03. Via /aspec:make-it-simple-v2.*
 *Implements: docs/mentor-followup-dashboard/plan.md*
 
-- [ ] 1. Schema and SQL functions — spec AC: #5, #8, #10, #11, #22
+- [x] 1. Schema and SQL functions — spec AC: #5, #8, #10, #11, #22
 - [ ] 2. Repository layer — spec AC: #5, #10, #11
 - [ ] 3. Config, Telegram mentions, fallback recipients and link — spec AC: #18, #8
 - [ ] 4. Dashboard skeleton and login — spec AC: #1, #2, #3, #4, #5, #6

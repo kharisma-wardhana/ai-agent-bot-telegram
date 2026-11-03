@@ -34,6 +34,7 @@ describe("migrations", () => {
       `select table_name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' order by 1`,
     );
     expect(r.rows.map((x) => x.table_name)).toEqual([
+      "dashboard_login_tokens", "dashboard_sessions", "dashboard_users", // 0004 (mentor-followup-dashboard)
       "feedback", "inference_heartbeat", "ingest_jobs", "knowledge_chunks", "knowledge_sources",
       "learners", "memory_edges", "memory_nodes", "mentor_followups", "pending_answers",
       "session_turns", "sessions",
