@@ -5,6 +5,7 @@
 import type { WelcomeSettings } from "../db/repository";
 import type { Deps } from "../deps";
 import { displayName } from "../telegram/parse-update";
+import type { MessageEntity } from "../telegram/client";
 import type { TgUser } from "../telegram/types";
 
 export const TEMPLATE_MAX = 1000;
@@ -48,6 +49,69 @@ export function memberName(u: TgUser): string {
 export function leaveNoticeText(u: TgUser, kicked: boolean): string {
   const who = `${memberName(u)}${u.username ? ` (@${u.username})` : ""}`;
   return `👋 ${who} ${kicked ? "dikeluarkan dari" : "keluar dari"} grup cohort.`;
+}
+
+// ---------- Rendering and posting the batch (AC 3, 4, 8, 11) ----------
+export interface Newcomer { id: number; name: string }
+
+/** "Ani", "Ani dan Budi", "Ani, Budi, dan Citra": with each name's [start, end) inside the joined string. */
+function joinNames(people: Newcomer[]): { text: string; spans: { id: number; name: string; start: number }[] } {
+  let text = "";
+  const spans: { id: number; name: string; start: number }[] = [];
+  people.forEach((p, i) => {
+    if (i > 0) text += people.length === 2 ? " dan " : i === people.length - 1 ? ", dan " : ", ";
+    spans.push({ id: p.id, name: p.name, start: text.length });
+    text += p.name;
+  });
+  return { text, spans };
+}
+
+/**
+ * Fills the template: {bot} → @username, every {nama} → the newcomers, each a text_mention.
+ * Plain text: the template is sent verbatim apart from the placeholders, never with parse_mode.
+ * Offsets are UTF-16 code units, which is JS string indexing (what Telegram expects).
+ */
+export function renderWelcome(template: string, people: Newcomer[], botUsername: string): { text: string; entities: MessageEntity[] } {
+  const names = joinNames(people);
+  const parts = template.replace(/\{bot\}/g, `@${botUsername}`).split("{nama}");
+  let text = "";
+  const entities: MessageEntity[] = [];
+  parts.forEach((part, i) => {
+    text += part;
+    if (i === parts.length - 1) return;
+    for (const s of names.spans) {
+      entities.push({ type: "text_mention", offset: text.length + s.start, length: s.name.length, user: { id: s.id, is_bot: false, first_name: s.name } });
+    }
+    text += names.text;
+  });
+  return { text, entities };
+}
+
+const MAX_BATCHES_PER_RUN = 10;
+
+/**
+ * Cron job: posts the waiting newcomers, 50 per message, into the welcome topic. Taking the list is atomic,
+ * so overlapping runs can't double-post. With welcomes switched off, waiting rows are dropped, not posted.
+ * A failed send puts that batch back for the next run.
+ */
+export async function postPendingWelcomes(d: Deps): Promise<number> {
+  const s = await loadSettings(d);
+  let posted = 0;
+  for (let i = 0; i < MAX_BATCHES_PER_RUN; i++) {
+    const batch = await d.repo.takePendingWelcomes(BATCH_SIZE);
+    if (batch.length === 0) break;
+    if (!s.welcomeEnabled) continue;
+    const { text, entities } = renderWelcome(s.template, batch.map((b) => ({ id: b.telegramId, name: b.displayName })), d.cfg.botUsername);
+    try {
+      await d.tg.sendMessage(d.cfg.groupChatId, text, { threadId: s.topicId ?? undefined, entities });
+      posted += batch.length;
+    } catch (e) {
+      console.error("welcome post failed; re-queueing batch", (e as Error).message);
+      for (const b of batch) await d.repo.queueWelcome(b.telegramId, b.displayName);
+      break;
+    }
+  }
+  return posted;
 }
 
 /** A join only queues the newcomer; the cron posts the batch (AC 1). Off switch = not queued (AC 7). */

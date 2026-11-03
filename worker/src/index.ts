@@ -8,7 +8,7 @@ import { runMemoryJob } from "./memory/graph-extractor";
 import type { DeferredImageEvent, LearnerSession } from "./pipeline/learner-session";
 import { classify } from "./telegram/parse-update";
 import type { TgUpdate } from "./telegram/types";
-import { handleMemberJoin, handleMemberLeave } from "./welcome/welcome";
+import { handleMemberJoin, handleMemberLeave, postPendingWelcomes } from "./welcome/welcome";
 
 export { LearnerSession } from "./pipeline/learner-session";
 
@@ -100,6 +100,7 @@ export async function deliverDeferredImages(d: Deps, env: Env): Promise<number> 
 export async function runScheduled(env: Env): Promise<void> {
   const d = getDeps(env);
   const jobs: [string, () => Promise<unknown>][] = [
+    ["welcome batch", () => postPendingWelcomes(d)], // cohort-welcome-message; first, and isolated like the rest
     ["expire sessions", () => d.repo.expireSessions(d.cfg.sessionTtlHours)],
     ["memory job", () => runMemoryJob(d)],
     ["deferred images", () => deliverDeferredImages(d, env)],

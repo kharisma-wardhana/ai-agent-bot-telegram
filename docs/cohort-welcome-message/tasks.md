@@ -6,6 +6,6 @@
 - [x] 2. Repository layer — spec AC: #13
 - [x] 3. Parsing chat_member updates — spec AC: #1, #2, #14
 - [x] 4. Join and leave handling in the webhook — spec AC: #1, #2, #5, #6, #7
-- [ ] 5. The welcome cron job — spec AC: #3, #4, #5, #7, #8, #11, #15
+- [x] 5. The welcome cron job — spec AC: #3, #4, #5, #7, #8, #11, #15
 - [ ] 6. Dashboard Sambutan page — spec AC: #9, #10, #11, #12
 - [ ] 7. Operator docs — spec AC: none (deploy readiness)
