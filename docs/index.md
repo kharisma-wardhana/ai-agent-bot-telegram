@@ -14,3 +14,4 @@ Project-wide review checklist: [REVIEW.md](../REVIEW.md)
   - [monitoring.md](telegram-rag-learning-companion/monitoring.md): control band on the fallback rate, response tiers, incident template, security scan, loop closure
 - **mentor-followup-dashboard**: phone-friendly web dashboard where mentors claim and reply to follow-up questions; the bot relays replies to learners
   - [intent.md](mentor-followup-dashboard/intent.md)
+  - [spec.md](mentor-followup-dashboard/spec.md)
