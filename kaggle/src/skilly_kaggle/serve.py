@@ -21,7 +21,7 @@ from typing import Callable, Protocol
 
 SECRET_HEADER = "X-Skilly-Secret"
 SERVED_MODEL_NAME = "qwen3-vl-8b"  # must match worker/src/llm/kaggle.ts KAGGLE_MODEL
-DEFAULT_MODEL = "Qwen/Qwen3-VL-8B-Instruct-AWQ"
+DEFAULT_MODEL = "Qwen/Qwen3-VL-8B-Instruct"
 ALLOWED = {("POST", "/v1/chat/completions"), ("GET", "/health")}
 MAX_BODY = 12 * 1024 * 1024  # an inline image as base64 plus the prompt
 
