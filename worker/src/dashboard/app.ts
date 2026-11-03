@@ -7,9 +7,11 @@ import {
   clearSessionCookies, dashboardOrigin, originOk, requestLoginLink, requireSession, setSessionCookies, startSession,
   withDeps, type DashEnv,
 } from "./auth";
-import { claimFollowup, followupImage, listFollowups, releaseFollowup, replyToFollowup } from "./followups";
+import {
+  addFollowupToKnowledge, claimFollowup, followupImage, knowledgeEntry, listFollowups, releaseFollowup, replyToFollowup,
+} from "./followups";
 import { addUser, listUsers, removeUser } from "./users";
-import { authConfirmPage, authFailedPage, listPage, loginPage, mentorPage } from "./views";
+import { authConfirmPage, authFailedPage, knowledgeConfirmPage, listPage, loginPage, mentorPage } from "./views";
 
 export function dashboardApp(): Hono<DashEnv> {
   const app = new Hono<DashEnv>();
@@ -81,6 +83,23 @@ export function dashboardApp(): Hono<DashEnv> {
     }
     const pesan = r.dm === "failed" || r.topic === "failed" ? "gagal-sebagian" : r.dm === "held" ? "ditahan" : "terkirim";
     return c.redirect(back(pesan, id, "selesai"), 303);
+  });
+
+  // ---------- Add to knowledge (AC 16, 17) ----------
+  app.get("/followups/:id{[0-9]+}/knowledge", async (c) => {
+    const id = Number(c.req.param("id"));
+    const info = await c.var.deps.repo.followupForKnowledge(id);
+    if (!info) return c.redirect(back("tidak-ditemukan", id, "selesai"), 303);
+    if (info.status !== "closed" || !info.replyText) return c.redirect(back("belum-selesai", id), 303);
+    if (info.knowledgeSourceId) return c.redirect(back("pengetahuan-sudah-ada", id, "selesai"), 303);
+    return c.html(knowledgeConfirmPage({ user: c.var.user, csrf: c.var.csrf, id, ...knowledgeEntry(info.question, info.replyText) }));
+  });
+
+  app.post("/followups/:id{[0-9]+}/knowledge", async (c) => {
+    const id = Number(c.req.param("id"));
+    const r = await addFollowupToKnowledge(c.var.deps, c.var.user, id);
+    const pesan = { added: "pengetahuan-ditambah", exists: "pengetahuan-sudah-ada", "not-closed": "belum-selesai", "not-found": "tidak-ditemukan" }[r];
+    return c.redirect(back(pesan, id, r === "not-closed" ? "" : "selesai"), 303);
   });
 
   // ---------- Mentor management (AC 7, 18) ----------

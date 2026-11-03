@@ -129,6 +129,10 @@ export const FLASH: Record<string, { text: string; bad?: boolean }> = {
   "gagal-sebagian": { text: "Pertanyaan ditutup, tapi ada pengiriman yang gagal. Lihat status di bawah dan tindak lanjuti manual.", bad: true },
   kosong: { text: "Jawaban tidak boleh kosong.", bad: true },
   "terlalu-panjang": { text: "Jawaban maksimal 900 karakter. Tidak ada yang dikirim.", bad: true },
+  "pengetahuan-ditambah": { text: "Ditambahkan ke basis pengetahuan. Kak Skilly bisa menjawab pertanyaan serupa mulai sekarang." },
+  "pengetahuan-sudah-ada": { text: "Sudah ada di basis pengetahuan. Tidak ada yang ditambahkan." },
+  "belum-selesai": { text: "Hanya pertanyaan yang sudah dijawab yang bisa ditambahkan ke pengetahuan.", bad: true },
+  "tidak-ditemukan": { text: "Pertanyaan tidak ditemukan.", bad: true },
 };
 
 export function fmtTime(d: Date | null): string {
@@ -148,9 +152,27 @@ function closedBlock(f: FollowupView): string {
   if (!f.replyText) return `<p class="meta">Ditutup tanpa jawaban di dashboard.</p>`;
   const dm = f.dmStatus ? DM_LABEL[f.dmStatus] : "—";
   const topic = f.topicStatus ? TOPIC_LABEL[f.topicStatus] : "—";
+  const knowledge = f.knowledgeSourceId
+    ? `<p class="meta">✓ Sudah ditambahkan ke pengetahuan</p>`
+    : `<p><a class="link" href="/dashboard/followups/${f.id}/knowledge">Tambahkan ke pengetahuan</a></p>`;
   return `<p class="meta">Jawaban dari ${esc(f.repliedByName ?? "mentor")} · ${esc(fmtTime(f.repliedAt))}</p>
   <p class="q">${esc(f.replyText)}</p>
-  <p class="meta">DM ke peserta: ${esc(dm)} · Topik grup: ${esc(topic)}</p>`;
+  <p class="meta">DM ke peserta: ${esc(dm)} · Topik grup: ${esc(topic)}</p>
+  ${knowledge}`;
+}
+
+/** Confirmation step for "Tambahkan ke pengetahuan" (no JavaScript, so a page instead of a dialog). */
+export function knowledgeConfirmPage(o: { user: DashUser; csrf: string; id: number; title: string; text: string }): string {
+  return page("Tambahkan ke pengetahuan", `<h2>Tambahkan ke pengetahuan?</h2>
+<article class="card">
+  <p class="meta">${esc(o.title)}</p>
+  <p class="q">${esc(o.text)}</p>
+</article>
+<p class="card flash bad" role="note">Setelah ditambahkan, entri ini tidak bisa dihapus dari dashboard dan Kak Skilly akan memakainya untuk menjawab pertanyaan serupa. Pastikan jawabannya benar dan tidak berisi data pribadi.</p>
+<form method="post" action="/dashboard/followups/${o.id}/knowledge" class="row">${csrfField(o.csrf)}
+  <button type="submit">Ya, tambahkan</button>
+  <a class="link" href="/dashboard?tab=selesai#f-${o.id}">Batal</a>
+</form>`, { user: o.user, csrf: o.csrf, current: "selesai" });
 }
 
 function itemCard(f: FollowupView, me: DashUser, csrf: string): string {

@@ -35,14 +35,25 @@ function titleFromText(text: string): string {
   return (t.length > 60 ? `${t.slice(0, 57)}…` : t) || "Materi tambahan";
 }
 
-async function addText(d: Deps, mentorId: number, text: string, title: string, sourceType: "text" | "md" | "txt", r2Key: string | null): Promise<string> {
+/**
+ * Chunk → embed → append, de-duplicated by content hash. Null when the text yields no chunks.
+ * Shared by /add_knowledge and the mentor dashboard's "Tambahkan ke pengetahuan".
+ */
+export async function ingestText(
+  d: Deps, addedBy: number, text: string, title: string, sourceType: "text" | "md" | "txt", r2Key: string | null,
+): Promise<{ sourceId: string | null; chunksAdded: number } | null> {
   const pieces = chunk(text);
-  if (pieces.length === 0) return MSG.usage;
+  if (pieces.length === 0) return null;
   const vectors = await d.embedder.embed(pieces);
-  const res = await d.repo.insertKnowledge(
-    { title, sourceType, origin: "add_knowledge", addedBy: mentorId, r2Key, contentHash: await contentHash(text) },
+  return d.repo.insertKnowledge(
+    { title, sourceType, origin: "add_knowledge", addedBy, r2Key, contentHash: await contentHash(text) },
     pieces.map((content, position) => ({ position, content, embedding: vectors[position]! })),
   );
+}
+
+async function addText(d: Deps, mentorId: number, text: string, title: string, sourceType: "text" | "md" | "txt", r2Key: string | null): Promise<string> {
+  const res = await ingestText(d, mentorId, text, title, sourceType, r2Key);
+  if (!res) return MSG.usage;
   return res.sourceId ? MSG.done(res.chunksAdded, title) : MSG.duplicate;
 }
 

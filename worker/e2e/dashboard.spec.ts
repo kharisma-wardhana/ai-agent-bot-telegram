@@ -93,4 +93,11 @@ test("reply: claim → type a reply → Kirim delivers it and the question shows
   const sends = calls.filter((c) => c.method === "sendMessage");
   expect(sends.filter((c) => c.params.chat_id === 501)).toHaveLength(1);
   expect(sends.filter((c) => c.params.chat_id === -1001234567890)).toHaveLength(1);
+
+  // Add to knowledge: confirmation page, then the result.
+  await card.getByRole("link", { name: "Tambahkan ke pengetahuan" }).click();
+  await expect(page.getByRole("heading", { name: "Tambahkan ke pengetahuan?" })).toBeVisible();
+  await page.getByRole("button", { name: "Ya, tambahkan" }).click();
+  await expect(page.getByRole("status")).toContainText("Ditambahkan ke basis pengetahuan");
+  await expect(page.locator(`#f-${id}`)).toContainText("Sudah ditambahkan ke pengetahuan");
 });

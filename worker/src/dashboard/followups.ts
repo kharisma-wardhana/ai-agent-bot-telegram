@@ -4,6 +4,7 @@
  */
 import type { ClosedFollowup, DmDelivery, FollowupTab, FollowupView, TopicDelivery } from "../db/repository";
 import type { Deps } from "../deps";
+import { ingestText } from "../knowledge/add-knowledge";
 import { TelegramError, type MessageEntity } from "../telegram/client";
 import { CLAIM_TTL_S, type DashUser } from "./auth";
 
@@ -107,4 +108,26 @@ export async function replyToFollowup(d: Deps, user: DashUser, id: number, rawRe
   const topic = await deliverTopic(d, closed, reply);
   await d.repo.setFollowupDelivery(id, dm, topic);
   return { kind: "delivered", dm, topic };
+}
+
+// ---------- Add to knowledge (spec › Adding a reply to the knowledge base, AC 16, 17) ----------
+export type KnowledgeResult = "added" | "exists" | "not-closed" | "not-found";
+
+export function knowledgeEntry(question: string, reply: string): { title: string; text: string } {
+  const words = question.replace(/\s+/g, " ").trim();
+  const head = words.length > 50 ? `${words.slice(0, 50).replace(/\s+\S*$/, "")}…` : words;
+  return { title: `Follow-up mentor: ${head || "pertanyaan"}`, text: `Pertanyaan: ${question.trim()}\nJawaban mentor: ${reply.trim()}` };
+}
+
+/** Appends one knowledge entry for a closed follow-up, once. Person-triggered only; never automatic. */
+export async function addFollowupToKnowledge(d: Deps, user: DashUser, id: number): Promise<KnowledgeResult> {
+  const info = await d.repo.followupForKnowledge(id);
+  if (!info) return "not-found";
+  if (info.status !== "closed" || !info.replyText) return "not-closed";
+  if (info.knowledgeSourceId) return "exists";
+  const { title, text } = knowledgeEntry(info.question, info.replyText);
+  const res = await ingestText(d, user.telegramId, text, title, "text", null);
+  if (!res?.sourceId) return "exists"; // same content already in the knowledge base (content hash)
+  await d.repo.setFollowupKnowledge(id, res.sourceId);
+  return "added";
 }

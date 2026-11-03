@@ -9,6 +9,6 @@
 - [x] 5. Follow-up list, claim/release, image proxy — spec AC: #8, #9, #10, #11, #19, #20
 - [x] 6. Reply delivery — spec AC: #12, #13, #14, #15
 - [x] 7. Mentor management — spec AC: #7, #18
-- [ ] 8. Add to knowledge — spec AC: #16, #17
+- [x] 8. Add to knowledge — spec AC: #16, #17
 - [ ] 9. Phone layout and accessibility markup — spec AC: #21
 - [ ] 10. Operator docs — spec AC: none (deploy readiness)
