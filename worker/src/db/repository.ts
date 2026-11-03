@@ -20,7 +20,7 @@ export class SupabaseRpc implements RpcClient {
   constructor(
     private readonly url: string,
     private readonly serviceKey: string,
-    private readonly fetchFn: typeof fetch = fetch,
+    private readonly fetchFn: typeof fetch = (...args) => fetch(...args),
   ) {}
 
   async call(fn: string, args: Record<string, unknown>): Promise<Row[]> {

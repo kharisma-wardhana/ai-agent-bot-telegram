@@ -12,7 +12,7 @@ export class KaggleBackend implements LlmBackend {
   constructor(
     private readonly baseUrl: string,
     private readonly sharedSecret: string,
-    private readonly fetchFn: typeof fetch = fetch,
+    private readonly fetchFn: typeof fetch = (...args) => fetch(...args),
     private readonly timeoutMs = 45_000,
   ) {}
 

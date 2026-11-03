@@ -26,7 +26,7 @@ export interface SendOptions {
 export class TelegramClient {
   constructor(
     private readonly token: string,
-    private readonly fetchFn: typeof fetch = fetch,
+    private readonly fetchFn: typeof fetch = (...args) => fetch(...args),
   ) {}
 
   async call<T>(method: string, params: Record<string, unknown>): Promise<T> {

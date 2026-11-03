@@ -29,7 +29,17 @@ export function buildDeps(env: Env): Deps {
     () => repo.heartbeatAgeSeconds("kaggle"),
     cfg.heartbeatMaxAgeS,
   );
-  return { cfg, repo, tg: new TelegramClient(cfg.telegramBotToken), router, embedder: new WorkersAiEmbedder(env.AI), transcriber: new WorkersAiTranscriber(env.AI), env, fetchFn: fetch, now: Date.now };
+  return {
+    cfg,
+    repo,
+    tg: new TelegramClient(cfg.telegramBotToken),
+    router,
+    embedder: new WorkersAiEmbedder(env.AI),
+    transcriber: new WorkersAiTranscriber(env.AI),
+    env,
+    fetchFn: (...args) => fetch(...args),
+    now: Date.now,
+  };
 }
 
 let override: ((env: Env) => Deps) | null = null;
