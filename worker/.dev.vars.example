@@ -1,0 +1,10 @@
+# Copy to .dev.vars for `wrangler dev`. Names only — fill values locally, never commit .dev.vars.
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
+SUPABASE_SERVICE_KEY=
+KAGGLE_SHARED_SECRET=
+MCP_TOKENS=
+
+# Optional: normally set in wrangler.toml [vars] (mentor-followup-dashboard). Not secrets.
+# DASHBOARD_OWNERS=owner@example.com:123456789
+# DASHBOARD_BASE_URL=http://localhost:8787

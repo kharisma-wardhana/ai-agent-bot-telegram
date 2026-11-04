@@ -1,0 +1,38 @@
+name = "skilly-worker"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Non-secret config. Secrets (TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET,
+# SUPABASE_SERVICE_KEY, KAGGLE_SHARED_SECRET, MCP_TOKENS) are set with
+# `wrangler secret put` by the owner, never committed.
+[vars]
+BOT_USERNAME = "REPLACE_ME_bot"
+GROUP_CHAT_ID = "0"
+MENTOR_IDS = "0"
+KNOWLEDGE_WHITELIST_IDS = ""
+SUPABASE_URL = "https://REPLACE_ME.supabase.co"
+KAGGLE_BASE_URL = "https://REPLACE_ME.example.com"
+RETRIEVAL_THRESHOLD = "0.45"
+RETRIEVAL_TOP_K = "5"
+HEARTBEAT_MAX_AGE_S = "90"
+MAX_ANSWER_CHARS = "1000"
+SESSION_TTL_HOURS = "24"
+
+[ai]
+binding = "AI"
+
+[[r2_buckets]]
+binding = "KNOWLEDGE_BUCKET"
+bucket_name = "skilly-knowledge"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[durable_objects.bindings]]
+name = "LEARNER_SESSION"
+class_name = "LearnerSession"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LearnerSession"]

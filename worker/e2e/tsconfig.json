@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "@cloudflare/workers-types"],
+    "lib": ["es2022"]
+  },
+  "include": [".", "../playwright.config.ts"],
+  "exclude": []
+}
